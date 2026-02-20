@@ -1,0 +1,2 @@
+-- Migration 00005: Seed Tags
+-- TODO: populate initial taxonomy tags once Open Decision OD-01 is resolved
