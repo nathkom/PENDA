@@ -95,7 +95,7 @@ function FeedCard({ event, costClass, costLabel }) {
   return (
     <Link
       to={`/events/${event.id}`}
-      className="group flex bg-white rounded-2xl border border-gray-200 hover:border-green-300 hover:shadow-lg transition-all overflow-hidden"
+      className="group flex bg-white rounded-2xl border border-gray-200 hover:border-green-300 hover:shadow-lg transition-all overflow-hidden max-h-[300px]"
       aria-label={`View details for ${event.title}`}
     >
       {/* Event image — flush left, fills full card height */}

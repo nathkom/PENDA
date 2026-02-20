@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { events } from "../data/events";
 import EventCard from "../components/EventCard";
+import EventGallery from "../components/EventGallery";
 
 const CATEGORY_LABELS = {
   social: "Social",
@@ -119,14 +120,15 @@ export default function EventDetail() {
               </div>
             </div>
 
-            {/* Hero image */}
-            <div className="aspect-video w-full bg-green-100">
-              <img
-                src={event.image_url}
-                alt={event.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
+            {/* Gallery / hero image */}
+            <EventGallery
+              images={
+                event.gallery_images?.length
+                  ? event.gallery_images
+                  : [{ url: event.image_url, alt: event.title }]
+              }
+              title={event.title}
+            />
 
             {/* Date / time / location */}
             <div className="px-6 pt-5 pb-2 flex flex-col gap-3">
