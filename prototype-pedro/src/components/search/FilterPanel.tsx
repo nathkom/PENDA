@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { X, SlidersHorizontal } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -37,6 +37,20 @@ export function FilterPanel({
   const isFree = searchParams.get("is_free") === "true"
   const indoors = searchParams.get("indoors") === "true"
   const outdoors = searchParams.get("outdoors") === "true"
+
+  const [neighborhoodQuery, setNeighborhoodQuery] = useState("")
+  const [neighborhoodOpen, setNeighborhoodOpen] = useState(false)
+  const neighborhoodInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (neighborhoodOpen && neighborhoodInputRef.current) {
+      neighborhoodInputRef.current.focus()
+    }
+  }, [neighborhoodOpen])
+
+  const filteredNeighborhoods = availableNeighborhoods.filter((n) =>
+    n.toLowerCase().includes(neighborhoodQuery.trim().toLowerCase()),
+  )
 
   // Count active filters
   const activeCount =
@@ -80,6 +94,9 @@ export function FilterPanel({
         params.delete("neighborhood")
       }
     })
+    // clear local search and close dropdown after selection
+    setNeighborhoodQuery("")
+    setNeighborhoodOpen(false)
   }
 
   function toggleBoolean(key: "is_free" | "indoors" | "outdoors") {
@@ -133,13 +150,27 @@ export function FilterPanel({
           <Select
             value={neighborhood || "_all"}
             onValueChange={(v) => setNeighborhood(v === "_all" ? "" : v)}
+            onOpenChange={(open) => {
+              setNeighborhoodOpen(open)
+              if (!open) setNeighborhoodQuery("")
+            }}
           >
             <SelectTrigger>
               <SelectValue placeholder="All neighborhoods" />
             </SelectTrigger>
             <SelectContent>
+              <div className="px-2 py-2">
+                <input
+                  ref={neighborhoodInputRef}
+                  type="search"
+                  value={neighborhoodQuery}
+                  onChange={(e) => setNeighborhoodQuery(e.target.value)}
+                  placeholder="Search neighborhoods"
+                  className="w-full rounded border px-2 py-1 text-sm"
+                />
+              </div>
               <SelectItem value="_all">All neighborhoods</SelectItem>
-              {availableNeighborhoods.map((n) => (
+              {filteredNeighborhoods.map((n) => (
                 <SelectItem key={n} value={n}>
                   {n}
                 </SelectItem>

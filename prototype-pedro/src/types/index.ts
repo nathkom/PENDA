@@ -28,3 +28,14 @@ export type EventCardData = Event & {
   places: { name: string; neighborhood: string | null } | null
   imageUrl?: string | null
 }
+
+export type EventWithPlace = Event & {
+  places: {
+    id: string
+    lat: number
+    lng: number
+    name: string
+    neighborhood: string | null
+  } | null
+  event_tags: { tags: Tag }[]
+}
