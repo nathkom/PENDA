@@ -24,7 +24,14 @@ function formatDate(dateStr) {
 }
 
 // ── Grid card (vertical) — used on Events page ────────────────────────────────
-function GridCard({ event, costClass, costLabel }) {
+function GridCard({
+  event,
+  costClass,
+  costLabel,
+  liked,
+  likeCount,
+  onToggleLike
+}) {
   return (
     <Link
       to={`/events/${event.id}`}
@@ -91,7 +98,14 @@ function GridCard({ event, costClass, costLabel }) {
 }
 
 // ── Feed card (horizontal) — used on Home & detail pages ─────────────────────
-function FeedCard({ event, costClass, costLabel }) {
+function FeedCard({
+  event,
+  costClass,
+  costLabel,
+  liked,
+  likeCount,
+  onToggleLike
+}) {
   return (
     <Link
       to={`/events/${event.id}`}
@@ -113,6 +127,23 @@ function FeedCard({ event, costClass, costLabel }) {
         <h3 className="font-bold text-gray-900 text-lg leading-snug group-hover:text-green-700 transition-colors line-clamp-2">
           {event.title}
         </h3>
+        <div className="flex items-center gap-2 mt-1">
+  <button
+    onClick={(e) => {
+      e.preventDefault();
+      onToggleLike?.(event.id);
+    }}
+    className={`text-lg transition ${
+      liked ? "text-red-500" : "text-gray-400"
+    }`}
+  >
+    ❤️
+  </button>
+
+  <span className="text-sm text-gray-600">
+    {likeCount ?? 0}
+  </span>
+</div>
 
         <div className="flex items-center gap-1.5 text-sm text-gray-500">
           <Calendar
@@ -172,16 +203,39 @@ function FeedCard({ event, costClass, costLabel }) {
 }
 
 // ── Exported component ────────────────────────────────────────────────────────
-export default function EventCard({ event, variant = "feed" }) {
+export default function EventCard({
+  event,
+  variant = "feed",
+  liked,
+  likeCount,
+  onToggleLike
+}) {
   const costClass = COST_BADGE[event.cost] ?? COST_BADGE.paid;
   const costLabel = event.cost_amount
     ? `${COST_LABEL[event.cost]} · ${event.cost_amount}`
     : COST_LABEL[event.cost];
 
-  if (variant === "grid") {
+    if (variant === "grid") {
+      return (
+        <GridCard
+          event={event}
+          costClass={costClass}
+          costLabel={costLabel}
+          liked={liked}
+          likeCount={likeCount}
+          onToggleLike={onToggleLike}
+        />
+      );
+    }
+    
     return (
-      <GridCard event={event} costClass={costClass} costLabel={costLabel} />
+      <FeedCard
+        event={event}
+        costClass={costClass}
+        costLabel={costLabel}
+        liked={liked}
+        likeCount={likeCount}
+        onToggleLike={onToggleLike}
+      />
     );
   }
-  return <FeedCard event={event} costClass={costClass} costLabel={costLabel} />;
-}
