@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -8,9 +8,11 @@ import {
   CalendarPlus,
   Share2,
 } from "lucide-react";
-import { events } from "../data/events";
+import { events as staticEvents } from "../data/events";
 import EventCard from "../components/EventCard";
 import EventGallery from "../components/EventGallery";
+import AccessibilityTags from "../components/AccessibilityTags";
+import { useUser } from "../context/UserContext";
 
 const CATEGORY_LABELS = {
   social: "Social",
@@ -36,6 +38,7 @@ function getCrowdLabel(level) {
 }
 
 function formatDate(isoDate) {
+  if (!isoDate) return "";
   const [year, month, day] = isoDate.split("-").map(Number);
   return new Date(year, month - 1, day).toLocaleDateString("en-US", {
     month: "short",
@@ -47,12 +50,38 @@ function formatDate(isoDate) {
 export default function EventDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user, createdEvents, deletedEventIds, editedEvents, bookmarkedEvents, toggleBookmark } = useUser();
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [id]);
 
-  const event = events.find((e) => e.id === id);
+  // Merged, filtered, and overridden event list
+  const allEvents = useMemo(() => {
+    const merged = [...createdEvents, ...staticEvents];
+    const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
+    return filtered.map((e) =>
+      editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e
+    );
+  }, [createdEvents, deletedEventIds, editedEvents]);
+
+  const event = allEvents.find((e) => e.id === id);
+
+  const [likedEvents, setLikedEvents] = useState(() => {
+    const saved = localStorage.getItem("likedEvents");
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  function toggleLike(eventId) {
+    const updated = { ...likedEvents, [eventId]: !likedEvents[eventId] };
+    setLikedEvents(updated);
+    localStorage.setItem("likedEvents", JSON.stringify(updated));
+  }
+
+  function getLikeCount(e) {
+    const base = e.likes || 0;
+    return likedEvents[e.id] ? base + 1 : base;
+  }
 
   if (!event) {
     return (
@@ -69,12 +98,12 @@ export default function EventDetail() {
     );
   }
 
-  const related = events
+  const related = allEvents
     .filter((e) => e.neighborhood === event.neighborhood && e.id !== event.id)
     .slice(0, 3);
 
   const costLabel = event.cost_amount
-    ? `${COST_LABEL[event.cost]} · ${event.cost_amount}`
+    ? `${COST_LABEL[event.cost]} · $${event.cost_amount}`
     : COST_LABEL[event.cost];
 
   return (
@@ -99,9 +128,20 @@ export default function EventDetail() {
 
             {/* Title + tags */}
             <div className="p-6 pb-4">
-              <h1 className="text-3xl font-bold text-gray-900 leading-tight mb-3">
-                {event.title}
-              </h1>
+              <div className="flex items-start gap-3 mb-3">
+                <h1 className="flex-1 text-3xl font-bold text-gray-900 leading-tight">
+                  {event.title}
+                </h1>
+                <button
+                  onClick={() => toggleLike(event.id)}
+                  className={`shrink-0 flex items-center gap-1.5 font-semibold transition-colors mt-1 ${
+                    likedEvents[event.id] ? "text-red-500" : "text-gray-400 hover:text-red-400"
+                  }`}
+                  aria-label={likedEvents[event.id] ? "Unlike event" : "Like event"}
+                >
+                  ❤️ <span className="text-base">{getLikeCount(event)}</span>
+                </button>
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium px-3 py-1 rounded-full border border-green-300 text-green-700">
                   {costLabel}
@@ -150,81 +190,128 @@ export default function EventDetail() {
             </div>
           </div>
 
-          {/* RIGHT — what to expect + actions */}
-          <div className="w-full lg:w-80 shrink-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col lg:sticky lg:top-24">
+          {/* RIGHT — sticky column */}
+          <div className="w-full lg:w-80 shrink-0 flex flex-col gap-4 lg:sticky lg:top-24">
 
-            {/* Green "What to expect" header */}
-            <div className="bg-green-50 px-6 py-5 border-b border-green-100">
-              <h2 className="text-xl font-bold text-gray-900">What to expect</h2>
-            </div>
+            {/* What to Expect card */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
 
-            {/* Key-value rows */}
-            <div className="px-6 py-5 flex flex-col gap-3 flex-1">
-              {event.crowd_vibe && (
-                <p className="text-sm text-gray-700">
-                  <span className="font-semibold">Crowd vibe: </span>
-                  {event.crowd_vibe}
-                </p>
-              )}
-              {event.social_pressure && (
-                <p className="text-sm text-gray-700">
-                  <span className="font-semibold">Social pressure: </span>
-                  {event.social_pressure}
-                </p>
-              )}
-              {event.space_format && (
-                <p className="text-sm text-gray-700">
-                  <span className="font-semibold">Space format: </span>
-                  {event.space_format}
-                </p>
-              )}
+              {/* Green "What to expect" header */}
+              <div className="bg-green-50 px-6 py-5 border-b border-green-100">
+                <h2 className="text-xl font-bold text-gray-900">What to expect</h2>
+              </div>
 
-              {/* Crowd level */}
-              {event.crowd_level != null && (
-                <div className="mt-3">
-                  <h3 className="font-bold text-gray-900 mb-3">
-                    Crowd Level (estimated):
-                  </h3>
-                  <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-green-500 rounded-full"
-                      style={{ width: `${event.crowd_level}%` }}
-                    />
-                  </div>
-                  <p className="text-sm font-semibold text-gray-700 mt-2">
-                    {getCrowdLabel(event.crowd_level)}
+              {/* Key-value rows */}
+              <div className="px-6 py-5 flex flex-col gap-3 flex-1">
+                {event.noise_level && (
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold">Noise level: </span>
+                    {event.noise_level}
                   </p>
-                </div>
-              )}
+                )}
+                {event.accessibility?.length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-1.5">Accessibility:</p>
+                    <AccessibilityTags tags={event.accessibility} />
+                  </div>
+                )}
+                {event.space_format && (
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold">Space format: </span>
+                    {event.space_format}
+                  </p>
+                )}
+
+                {/* Crowd level */}
+                {event.crowd_level != null && (
+                  <div className="mt-3">
+                    <h3 className="font-bold text-gray-900 mb-3">
+                      Crowd Level (estimated):
+                    </h3>
+                    <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-green-500 rounded-full"
+                        style={{ width: `${event.crowd_level}%` }}
+                      />
+                    </div>
+                    <p className="text-sm font-semibold text-gray-700 mt-2">
+                      {getCrowdLabel(event.crowd_level)}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="px-5 py-4 border-t border-gray-100 flex items-center gap-2">
+                <button
+                  onClick={() => toggleBookmark(event.id)}
+                  className={`flex items-center justify-center gap-1.5 flex-1 border font-semibold py-2.5 rounded-xl text-sm transition-colors ${
+                    bookmarkedEvents.has(event.id)
+                      ? "border-green-400 bg-green-50 text-green-700"
+                      : "border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-700"
+                  }`}
+                  aria-label={bookmarkedEvents.has(event.id) ? "Remove bookmark" : "Save this event"}
+                >
+                  <Bookmark size={15} />
+                  {bookmarkedEvents.has(event.id) ? "Saved" : "Save"}
+                </button>
+                <button
+                  className="flex items-center justify-center gap-1.5 flex-1 border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition-colors"
+                  aria-label="Add to calendar"
+                >
+                  <CalendarPlus size={15} />
+                  Calendar
+                </button>
+                <button
+                  className="border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-700 p-2.5 rounded-xl transition-colors"
+                  aria-label="Share this event"
+                >
+                  <Share2 size={15} />
+                </button>
+              </div>
             </div>
 
-            {/* Action buttons */}
-            <div className="px-5 py-4 border-t border-gray-100 flex items-center gap-2">
-              <button
-                className="flex items-center justify-center gap-1.5 flex-1 border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition-colors"
-                aria-label="Save this event"
-              >
-                <Bookmark size={15} />
-                Save
-              </button>
-              <button
-                className="flex items-center justify-center gap-1.5 flex-1 border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition-colors"
-                aria-label="Add to calendar"
-              >
-                <CalendarPlus size={15} />
-                Add to calendar
-              </button>
-              <button
-                className="border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-700 p-2.5 rounded-xl transition-colors"
-                aria-label="Share this event"
-              >
-                <Share2 size={15} />
-              </button>
+            {/* Attending card */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="bg-blue-50 px-6 py-5 border-b border-blue-100">
+                <h2 className="text-xl font-bold text-gray-900">Want to attend?</h2>
+              </div>
+              <div className="px-6 py-5 flex flex-col gap-4">
+                {event.attending_limit ? (
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-gray-700 font-semibold">{event.attending_count || 0} attending</span>
+                      <span className="text-gray-400">{event.attending_limit} spots total</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, ((event.attending_count || 0) / event.attending_limit) * 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      {Math.max(0, event.attending_limit - (event.attending_count || 0))} spots remaining
+                    </p>
+                  </div>
+                ) : null}
+                {user ? (
+                  <button className="w-full bg-green-700 hover:bg-green-800 text-white font-semibold py-3 rounded-xl text-sm transition-colors">
+                    Mark as Attending
+                  </button>
+                ) : (
+                  <Link
+                    to="/signin"
+                    className="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl text-sm transition-colors"
+                  >
+                    Sign in to attend
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Related events — unchanged */}
+        {/* Related events */}
         {related.length > 0 && (
           <section className="mt-14" aria-labelledby="related-heading">
             <h2
@@ -235,7 +322,12 @@ export default function EventDetail() {
             </h2>
             <div className="flex flex-col gap-4">
               {related.map((e) => (
-                <EventCard key={e.id} event={e} />
+                <EventCard
+                  key={e.id}
+                  event={e}
+                  bookmarked={bookmarkedEvents.has(e.id)}
+                  onToggleBookmark={toggleBookmark}
+                />
               ))}
             </div>
           </section>

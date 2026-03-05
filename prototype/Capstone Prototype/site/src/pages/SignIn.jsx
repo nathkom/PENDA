@@ -25,10 +25,12 @@ export default function SignIn() {
   return (
     <main className="bg-gray-50 min-h-screen flex items-center justify-center px-4 py-16">
       <div className="w-full max-w-md">
-
         {/* Logo */}
         <div className="text-center mb-8">
-          <Link to="/" className="text-3xl font-bold text-green-700 tracking-tight">
+          <Link
+            to="/"
+            className="text-3xl font-bold text-green-700 tracking-tight"
+          >
             ThirdSpace
           </Link>
           <p className="text-gray-500 mt-2 text-sm">
@@ -40,11 +42,17 @@ export default function SignIn() {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
           <h1 className="text-xl font-bold text-gray-900 mb-6">Welcome back</h1>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
-
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-5"
+            noValidate
+          >
             {/* Email */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="email" className="text-sm font-semibold text-gray-700">
+              <label
+                htmlFor="email"
+                className="text-sm font-semibold text-gray-700"
+              >
                 Email
               </label>
               <div className="relative">
@@ -59,7 +67,10 @@ export default function SignIn() {
                   autoComplete="email"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError("");
+                  }}
                   className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
@@ -68,7 +79,10 @@ export default function SignIn() {
             {/* Password */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor="password" className="text-sm font-semibold text-gray-700">
+                <label
+                  htmlFor="password"
+                  className="text-sm font-semibold text-gray-700"
+                >
                   Password
                 </label>
                 <button
@@ -90,7 +104,10 @@ export default function SignIn() {
                   autoComplete="current-password"
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError("");
+                  }}
                   className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
                 <button
@@ -117,6 +134,45 @@ export default function SignIn() {
               Sign In
             </button>
           </form>
+
+          {/* Demo access */}
+          <div className="mt-5 flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-gray-400 font-medium">
+                Demo Accounts
+              </span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setUser({
+                  name: "Demo Host",
+                  email: "host@demo.com",
+                  role: "host",
+                });
+                navigate("/host");
+              }}
+              className="w-full bg-green-700 hover:bg-green-800 text-white font-semibold py-2.5 rounded-xl transition-colors"
+            >
+              Demo Host
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUser({
+                  name: "Demo User",
+                  email: "user@demo.com",
+                  role: "user",
+                });
+                navigate("/");
+              }}
+              className="w-full bg-green-700 hover:bg-green-800 text-white font-semibold py-2.5 rounded-xl transition-colors"
+            >
+              Demo User
+            </button>
+          </div>
         </div>
 
         {/* Sign up prompt */}

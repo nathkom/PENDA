@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
-import { MapPin, Calendar, Clock } from "lucide-react";
-import AccessibilityTags from "./AccessibilityTags";
+import { MapPin, Calendar, Clock, Bookmark, CalendarPlus, Share2 } from "lucide-react";
 
 const COST_BADGE = {
   free: "bg-green-100 text-green-700",
@@ -15,6 +14,7 @@ const COST_LABEL = {
 };
 
 function formatDate(dateStr) {
+  if (!dateStr) return "";
   const [year, month, day] = dateStr.split("-").map(Number);
   return new Date(year, month - 1, day).toLocaleDateString("en-US", {
     month: "short",
@@ -23,15 +23,127 @@ function formatDate(dateStr) {
   });
 }
 
+// ── Feed card (horizontal, h-220) — used on Home ─────────────────────────────
+function FeedCard({ event, costClass, costLabel, liked, likeCount, onToggleLike, bookmarked, onToggleBookmark }) {
+  return (
+    <Link
+      to={`/events/${event.id}`}
+      className="block bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow group h-[220px]"
+      aria-label={`View details for ${event.title}`}
+    >
+      <div className="flex h-full">
+        {/* Image */}
+        <div className="w-52 shrink-0 overflow-hidden">
+          <img
+            src={event.image_url}
+            alt={event.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+          />
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 p-4 flex flex-col min-w-0 overflow-hidden gap-1.5">
+
+          {/* Title + like button */}
+          <div className="flex items-start gap-2">
+            <h3 className="flex-1 text-lg font-bold text-gray-900 leading-tight line-clamp-1 group-hover:text-green-700 transition-colors">
+              {event.title}
+            </h3>
+            <button
+              className={`shrink-0 flex items-center gap-1 transition-colors ${
+                liked ? "text-red-500" : "text-gray-300 hover:text-red-400"
+              }`}
+              onClick={(e) => { e.preventDefault(); onToggleLike?.(event.id); }}
+              aria-label={liked ? "Unlike event" : "Like event"}
+            >
+              ❤️ <span className="text-xs text-gray-500">{likeCount ?? 0}</span>
+            </button>
+          </div>
+
+          {/* Meta — single row */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+            {event.date && (
+              <span className="flex items-center gap-1">
+                <Calendar size={11} className="text-green-600 shrink-0" />
+                {formatDate(event.date)}
+              </span>
+            )}
+            {event.time && (
+              <span className="flex items-center gap-1">
+                <Clock size={11} className="text-green-600 shrink-0" />
+                {event.time}
+              </span>
+            )}
+            {event.space_name && (
+              <span className="flex items-center gap-1 truncate">
+                <MapPin size={11} className="text-green-600 shrink-0" />
+                <span className="truncate">{event.space_name}, Seattle</span>
+              </span>
+            )}
+          </div>
+
+          {/* Description */}
+          {event.description && (
+            <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
+              {event.description}
+            </p>
+          )}
+
+          {/* Tags + action buttons — pushed to bottom */}
+          <div className="flex items-center justify-between mt-auto gap-2">
+            <div className="flex flex-wrap gap-1 min-w-0 overflow-hidden">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${costClass}`}>
+                {costLabel}
+              </span>
+              {event.tags?.slice(0, 2).map((tag) => (
+                <span
+                  key={tag}
+                  className="text-xs px-2 py-0.5 rounded-full border border-green-300 text-green-700 capitalize whitespace-nowrap"
+                >
+                  {tag.replace(/_/g, " ")}
+                </span>
+              ))}
+            </div>
+
+            {/* Action buttons */}
+            <div
+              className="flex gap-1 shrink-0"
+              onClick={(e) => e.preventDefault()}
+            >
+              <button
+                onClick={() => onToggleBookmark?.(event.id)}
+                className={`p-1.5 rounded-lg border transition-colors ${
+                  bookmarked
+                    ? "border-green-400 text-green-700 bg-green-50"
+                    : "border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-500"
+                }`}
+                aria-label={bookmarked ? "Remove bookmark" : "Bookmark event"}
+              >
+                <Bookmark size={13} />
+              </button>
+              <button
+                className="p-1.5 rounded-lg border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-500 transition-colors"
+                aria-label="Add to calendar"
+              >
+                <CalendarPlus size={13} />
+              </button>
+              <button
+                className="p-1.5 rounded-lg border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-500 transition-colors"
+                aria-label="Share event"
+              >
+                <Share2 size={13} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 // ── Grid card (vertical) — used on Events page ────────────────────────────────
-function GridCard({
-  event,
-  costClass,
-  costLabel,
-  liked,
-  likeCount,
-  onToggleLike
-}) {
+function GridCard({ event, costClass, costLabel, liked, likeCount, onToggleLike, bookmarked, onToggleBookmark }) {
   return (
     <Link
       to={`/events/${event.id}`}
@@ -54,11 +166,15 @@ function GridCard({
           <h3 className="font-bold text-gray-900 text-base leading-snug group-hover:text-green-700 transition-colors line-clamp-2 flex-1">
             {event.title}
           </h3>
-          <span
-            className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${costClass}`}
+          <button
+            className={`shrink-0 flex items-center gap-1 transition-colors ${
+              liked ? "text-red-500" : "text-gray-300 hover:text-red-400"
+            }`}
+            onClick={(e) => { e.preventDefault(); onToggleLike?.(event.id); }}
+            aria-label={liked ? "Unlike event" : "Like event"}
           >
-            {costLabel}
-          </span>
+            ❤️ <span className="text-xs text-gray-500">{likeCount ?? 0}</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -80,123 +196,31 @@ function GridCard({
           {event.description}
         </p>
 
-        {event.tags?.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-auto pt-2">
-            {event.tags.slice(0, 3).map((tag) => (
+        <div className="flex items-center justify-between mt-auto pt-2 gap-2">
+          <div className="flex flex-wrap gap-1 min-w-0 overflow-hidden">
+            {event.tags?.slice(0, 3).map((tag) => (
               <span
                 key={tag}
-                className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full capitalize font-medium"
+                className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full capitalize font-medium whitespace-nowrap"
               >
                 {tag.replace(/_/g, " ")}
               </span>
             ))}
           </div>
-        )}
-      </div>
-    </Link>
-  );
-}
-
-// ── Feed card (horizontal) — used on Home & detail pages ─────────────────────
-function FeedCard({
-  event,
-  costClass,
-  costLabel,
-  liked,
-  likeCount,
-  onToggleLike
-}) {
-  return (
-    <Link
-      to={`/events/${event.id}`}
-      className="group flex bg-white rounded-2xl border border-gray-200 hover:border-green-300 hover:shadow-lg transition-all overflow-hidden max-h-[300px]"
-      aria-label={`View details for ${event.title}`}
-    >
-      {/* Event image — flush left, fills full card height */}
-      <div className="shrink-0 w-44 sm:w-52">
-        <img
-          src={event.image_url}
-          alt={event.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          loading="lazy"
-        />
-      </div>
-
-      {/* Event info */}
-      <div className="flex flex-col gap-2 min-w-0 flex-1 p-4 sm:p-5">
-        <h3 className="font-bold text-gray-900 text-lg leading-snug group-hover:text-green-700 transition-colors line-clamp-2">
-          {event.title}
-        </h3>
-        <div className="flex items-center gap-2 mt-1">
-  <button
-    onClick={(e) => {
-      e.preventDefault();
-      onToggleLike?.(event.id);
-    }}
-    className={`text-lg transition ${
-      liked ? "text-red-500" : "text-gray-400"
-    }`}
-  >
-    ❤️
-  </button>
-
-  <span className="text-sm text-gray-600">
-    {likeCount ?? 0}
-  </span>
-</div>
-
-        <div className="flex items-center gap-1.5 text-sm text-gray-500">
-          <Calendar
-            size={14}
-            className="text-blue-500 shrink-0"
-            aria-hidden="true"
-          />
-          <span>{formatDate(event.date)}</span>
-          <span className="mx-1">·</span>
-          <Clock
-            size={14}
-            className="text-orange-500 shrink-0"
-            aria-hidden="true"
-          />
-          <span>{event.time}</span>
-        </div>
-
-        <div className="flex items-center gap-1.5 text-sm text-gray-500">
-          <MapPin
-            size={14}
-            className="text-red-500 shrink-0"
-            aria-hidden="true"
-          />
-          <span className="truncate">
-            {event.space_name} · {event.neighborhood}
-          </span>
-        </div>
-
-        <p className="text-sm text-gray-600 flex-1 min-h-0 line-clamp-6 mt-0.5 leading-relaxed">
-          {event.description}
-        </p>
-
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          <span
-            className={`text-xs font-semibold px-2.5 py-1 rounded-full ${costClass}`}
-          >
-            {costLabel}
-          </span>
-          {event.tags?.slice(0, 3).map((tag) => (
-            <span
-              key={tag}
-              className="text-xs bg-green-50 text-green-700 px-2.5 py-1 rounded-full capitalize font-medium"
+          <div className="flex gap-1 shrink-0" onClick={(e) => e.preventDefault()}>
+            <button
+              onClick={() => onToggleBookmark?.(event.id)}
+              className={`p-1.5 rounded-lg border transition-colors ${
+                bookmarked
+                  ? "border-green-400 text-green-700 bg-green-50"
+                  : "border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-500"
+              }`}
+              aria-label={bookmarked ? "Remove bookmark" : "Bookmark event"}
             >
-              {tag.replace(/_/g, " ")}
-            </span>
-          ))}
-        </div>
-
-        {event.accessibility?.length > 0 && (
-          <div className="mt-0.5">
-            <AccessibilityTags tags={event.accessibility} />
+              <Bookmark size={12} />
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </Link>
   );
@@ -208,34 +232,40 @@ export default function EventCard({
   variant = "feed",
   liked,
   likeCount,
-  onToggleLike
+  onToggleLike,
+  bookmarked,
+  onToggleBookmark,
 }) {
   const costClass = COST_BADGE[event.cost] ?? COST_BADGE.paid;
   const costLabel = event.cost_amount
     ? `${COST_LABEL[event.cost]} · ${event.cost_amount}`
     : COST_LABEL[event.cost];
 
-    if (variant === "grid") {
-      return (
-        <GridCard
-          event={event}
-          costClass={costClass}
-          costLabel={costLabel}
-          liked={liked}
-          likeCount={likeCount}
-          onToggleLike={onToggleLike}
-        />
-      );
-    }
-    
+  if (variant === "grid") {
     return (
-      <FeedCard
+      <GridCard
         event={event}
         costClass={costClass}
         costLabel={costLabel}
         liked={liked}
         likeCount={likeCount}
         onToggleLike={onToggleLike}
+        bookmarked={bookmarked}
+        onToggleBookmark={onToggleBookmark}
       />
     );
   }
+
+  return (
+    <FeedCard
+      event={event}
+      costClass={costClass}
+      costLabel={costLabel}
+      liked={liked}
+      likeCount={likeCount}
+      onToggleLike={onToggleLike}
+      bookmarked={bookmarked}
+      onToggleBookmark={onToggleBookmark}
+    />
+  );
+}

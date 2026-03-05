@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
-import { events } from "../data/events";
+import { events as staticEvents } from "../data/events";
 import { useUser } from "../context/UserContext";
 import { filterEvents } from "../utils/filters";
 import BulletinBoard from "../components/BulletinBoard";
@@ -41,13 +41,21 @@ const getLikeCount = (event) => {
   const base = event.likes || 0;
   return likedEvents[event.id] ? base + 1 : base;
 };
-  const { user } = useUser();
+  const { user, createdEvents, deletedEventIds, editedEvents, bookmarkedEvents, toggleBookmark } = useUser();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
+  const allEvents = useMemo(() => {
+    const merged = [...createdEvents, ...staticEvents];
+    const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
+    return filtered
+      .map((e) => editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e)
+      .filter((e) => !e.attending_limit || (e.attending_count || 0) < e.attending_limit);
+  }, [createdEvents, deletedEventIds, editedEvents]);
+
   const filteredEvents = useMemo(
-    () => filterEvents(events, filters),
-    [filters]
+    () => filterEvents(allEvents, filters),
+    [allEvents, filters]
   );
   let displayedEvents = [...filteredEvents];
 
@@ -125,6 +133,8 @@ if (sortType === "mostLiked") {
     liked={likedEvents[event.id]}
     likeCount={getLikeCount(event)}
     onToggleLike={toggleLike}
+    bookmarked={bookmarkedEvents.has(event.id)}
+    onToggleBookmark={toggleBookmark}
   />
 ))}
               </div>

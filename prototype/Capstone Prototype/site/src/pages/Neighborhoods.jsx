@@ -1,7 +1,9 @@
+import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowLeft, MapPin, ArrowRight } from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
 import { neighborhoods } from "../data/neighborhoods";
-import { events } from "../data/events";
+import { events as staticEvents } from "../data/events";
+import { useUser } from "../context/UserContext";
 import EventCard from "../components/EventCard";
 import EmptyState from "../components/EmptyState";
 
@@ -10,42 +12,49 @@ function NeighborhoodTile({ neighborhood, onClick }) {
   return (
     <button
       onClick={() => onClick(neighborhood.id)}
-      className="group relative rounded-2xl overflow-hidden aspect-[4/3] w-full focus:outline-none focus:ring-4 focus:ring-green-500 focus:ring-offset-2"
+      className="group flex flex-col items-center w-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 rounded-[28px]"
       aria-label={`Explore ${neighborhood.name}`}
     >
-      {/* Photo */}
-      <img
-        src={neighborhood.image_url}
-        alt={neighborhood.name}
-        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-        loading="lazy"
-      />
-
-      {/* Dark gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-
-      {/* Text overlay */}
-      <div className="absolute bottom-0 left-0 right-0 p-4">
-        <h2 className="text-white text-xl font-bold leading-tight drop-shadow">
-          {neighborhood.name}
-        </h2>
-        <p className="text-white/75 text-xs mt-0.5 font-medium">
-          {neighborhood.descriptor}
-        </p>
+      {/* Image with large rounded corners and wavy cookie-cutout bottom edge */}
+      <div className="relative w-full rounded-[28px] overflow-hidden aspect-square">
+        <img
+          src={neighborhood.image_url}
+          alt={neighborhood.name}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          loading="lazy"
+        />
+        {/* Wavy SVG overlay cuts into the bottom of the image */}
+        <svg
+          className="absolute bottom-0 left-0 w-full h-10"
+          viewBox="0 0 400 40"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M0,20 Q100,0 200,20 Q300,40 400,20 L400,40 L0,40 Z"
+            fill="#f9fafb"
+          />
+        </svg>
       </div>
 
-      {/* Hover arrow */}
-      <div className="absolute top-3 right-3 bg-white/0 group-hover:bg-white/20 rounded-full p-2 transition-all duration-300 opacity-0 group-hover:opacity-100">
-        <ArrowRight size={16} className="text-white" aria-hidden="true" />
-      </div>
+      {/* Name below the card */}
+      <h2 className="mt-3 text-base font-semibold text-gray-900 group-hover:text-green-700 transition-colors text-center">
+        {neighborhood.name}
+      </h2>
     </button>
   );
 }
 
 // ─── Neighborhood detail view ─────────────────────────────────────────────────
-function NeighborhoodDetail({ neighborhood, onBack }) {
-  const neighborhoodEvents = events.filter(
-    (e) => e.neighborhood === neighborhood.name
+function NeighborhoodDetail({
+  neighborhood,
+  onBack,
+  allEvents,
+  bookmarkedEvents,
+  toggleBookmark,
+}) {
+  const neighborhoodEvents = allEvents.filter(
+    (e) => e.neighborhood === neighborhood.name,
   );
 
   return (
@@ -85,7 +94,8 @@ function NeighborhoodDetail({ neighborhood, onBack }) {
         </p>
         <div className="shrink-0 flex items-center gap-2 text-sm text-green-700 font-semibold bg-green-50 border border-green-200 px-4 py-2 rounded-xl">
           <MapPin size={15} aria-hidden="true" />
-          {neighborhoodEvents.length} event{neighborhoodEvents.length !== 1 ? "s" : ""} happening here
+          {neighborhoodEvents.length} event
+          {neighborhoodEvents.length !== 1 ? "s" : ""} happening here
         </div>
       </div>
 
@@ -95,7 +105,12 @@ function NeighborhoodDetail({ neighborhood, onBack }) {
       ) : (
         <div className="flex flex-col gap-4">
           {neighborhoodEvents.map((event) => (
-            <EventCard key={event.id} event={event} />
+            <EventCard
+              key={event.id}
+              event={event}
+              bookmarked={bookmarkedEvents?.has(event.id)}
+              onToggleBookmark={toggleBookmark}
+            />
           ))}
         </div>
       )}
@@ -106,7 +121,25 @@ function NeighborhoodDetail({ neighborhood, onBack }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function Neighborhoods() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const {
+    createdEvents,
+    deletedEventIds,
+    editedEvents,
+    bookmarkedEvents,
+    toggleBookmark,
+  } = useUser();
   const selectedId = searchParams.get("id");
+
+  const allEvents = useMemo(() => {
+    const merged = [...createdEvents, ...staticEvents];
+    const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
+    return filtered
+      .map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e))
+      .filter(
+        (e) =>
+          !e.attending_limit || (e.attending_count || 0) < e.attending_limit,
+      );
+  }, [createdEvents, deletedEventIds, editedEvents]);
 
   const selected = selectedId
     ? neighborhoods.find((n) => n.id === selectedId)
@@ -126,33 +159,42 @@ export default function Neighborhoods() {
   if (selected) {
     return (
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <NeighborhoodDetail neighborhood={selected} onBack={handleBack} />
+        <NeighborhoodDetail
+          neighborhood={selected}
+          onBack={handleBack}
+          allEvents={allEvents}
+          bookmarkedEvents={bookmarkedEvents}
+          toggleBookmark={toggleBookmark}
+        />
       </main>
     );
   }
 
   // ── Grid catalog ──
   return (
-    <main className="max-w-7xl mx-auto px-4 py-10">
-      {/* Page header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Explore Neighborhoods</h1>
-        <p className="text-gray-500 mt-1.5 text-base">
-          Discover community events in your corner of greater Seattle.
-        </p>
-      </div>
+    <main className="bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 py-10">
+        {/* Page header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Explore Neighborhoods
+          </h1>
+          <p className="text-gray-500 mt-1.5 text-base">
+            Discover community events in your corner of Greater Seattle Area.
+          </p>
+        </div>
 
-      {/* Neighborhood grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {neighborhoods.map((n) => (
-          <NeighborhoodTile key={n.id} neighborhood={n} onClick={handleSelect} />
-        ))}
+        {/* Neighborhood grid — 3 per row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {neighborhoods.map((n) => (
+            <NeighborhoodTile
+              key={n.id}
+              neighborhood={n}
+              onClick={handleSelect}
+            />
+          ))}
+        </div>
       </div>
-
-      {/* Footer hint */}
-      <p className="text-center text-sm text-gray-400 mt-10">
-        Click any neighborhood to browse its events
-      </p>
     </main>
   );
 }

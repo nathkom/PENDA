@@ -7,6 +7,8 @@ import Neighborhoods from "./pages/Neighborhoods";
 import Events from "./pages/Events";
 import EventDetail from "./pages/EventDetail";
 import SignIn from "./pages/SignIn";
+import HostTools from "./pages/HostTools";
+import UserDashboard from "./pages/UserDashboard";
 
 export default function App() {
   return (
@@ -21,6 +23,8 @@ export default function App() {
               <Route path="/events" element={<Events />} />
               <Route path="/events/:id" element={<EventDetail />} />
               <Route path="/signin" element={<SignIn />} />
+              <Route path="/host" element={<HostTools />} />
+              <Route path="/dashboard" element={<UserDashboard />} />
             </Routes>
           </div>
           <Footer />
