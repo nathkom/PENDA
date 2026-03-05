@@ -31,7 +31,7 @@ export default function SignIn() {
             to="/"
             className="text-3xl font-bold text-green-700 tracking-tight"
           >
-            ThirdSpace
+            Common Grounds
           </Link>
           <p className="text-gray-500 mt-2 text-sm">
             Sign in to discover your community

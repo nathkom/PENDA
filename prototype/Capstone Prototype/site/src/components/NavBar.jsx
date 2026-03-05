@@ -1,6 +1,20 @@
 import { useState, useRef, useEffect } from "react";
-import { Link, NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Menu, X, User, LogOut, Settings, Search, Bookmark } from "lucide-react";
+import {
+  Link,
+  NavLink,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
+import {
+  Menu,
+  X,
+  User,
+  LogOut,
+  Settings,
+  Search,
+  Bookmark,
+} from "lucide-react";
 import { useUser } from "../context/UserContext";
 
 const NAV_LINKS = [
@@ -37,9 +51,13 @@ export default function NavBar() {
   // Sliding pill animation
   useEffect(() => {
     const activeIndex = NAV_LINKS.findIndex(({ to, end }) =>
-      end ? location.pathname === to : location.pathname.startsWith(to)
+      end ? location.pathname === to : location.pathname.startsWith(to),
     );
-    if (activeIndex >= 0 && itemRefs.current[activeIndex] && containerRef.current) {
+    if (
+      activeIndex >= 0 &&
+      itemRefs.current[activeIndex] &&
+      containerRef.current
+    ) {
       const containerRect = containerRef.current.getBoundingClientRect();
       const itemRect = itemRefs.current[activeIndex].getBoundingClientRect();
       setSliderStyle({
@@ -78,7 +96,7 @@ export default function NavBar() {
         else next.delete("q");
         return next;
       },
-      { replace: true }
+      { replace: true },
     );
   }
 
@@ -95,19 +113,17 @@ export default function NavBar() {
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
       <nav className="max-w-6xl mx-auto px-4 h-16 flex items-center gap-2">
-
         {/* Logo */}
         <Link
           to="/"
           className="text-xl font-bold text-green-700 tracking-tight shrink-0"
           aria-label="Third Space Finder home"
         >
-          ThirdSpace
+          Common Grounds
         </Link>
 
         {/* ── Desktop center: pill nav ↔ search bar ── */}
         <div className="hidden md:flex flex-1 items-center justify-center overflow-hidden px-4">
-
           {/* Pill nav — slides right and fades out on events page */}
           <ul
             ref={containerRef}
@@ -182,7 +198,6 @@ export default function NavBar() {
 
         {/* ── Desktop right section ── */}
         <div className="hidden md:flex items-center gap-3 shrink-0">
-
           {/* Plain nav links — slide in on events page */}
           <div
             className="flex items-center gap-5"
@@ -216,7 +231,9 @@ export default function NavBar() {
           {/* Create + button (hosts only) */}
           {user?.role === "host" && (
             <button
-              onClick={() => navigate("/host", { state: { section: "events" } })}
+              onClick={() =>
+                navigate("/host", { state: { section: "events" } })
+              }
               className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-green-700 hover:bg-green-800 text-white text-sm font-semibold transition-colors"
               aria-label="Create a new event"
             >
@@ -240,7 +257,9 @@ export default function NavBar() {
                 <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden z-50">
                   {/* User info */}
                   <div className="px-4 py-3 border-b border-gray-100">
-                    <p className="font-semibold text-sm text-gray-900 truncate">{user.name}</p>
+                    <p className="font-semibold text-sm text-gray-900 truncate">
+                      {user.name}
+                    </p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {user.role === "host" ? "Event Host" : "Member"}
                     </p>
@@ -249,7 +268,10 @@ export default function NavBar() {
                   {/* Host Tools — only visible to hosts */}
                   {user.role === "host" && (
                     <button
-                      onClick={() => { setProfileOpen(false); navigate("/host"); }}
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate("/host");
+                      }}
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     >
                       <Settings size={15} className="text-gray-400" />
@@ -261,14 +283,22 @@ export default function NavBar() {
                   {user.role !== "host" && (
                     <>
                       <button
-                        onClick={() => { setProfileOpen(false); navigate("/dashboard"); }}
+                        onClick={() => {
+                          setProfileOpen(false);
+                          navigate("/dashboard");
+                        }}
                         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                       >
                         <User size={15} className="text-gray-400" />
                         Profile
                       </button>
                       <button
-                        onClick={() => { setProfileOpen(false); navigate("/dashboard", { state: { section: "bookmarks" } }); }}
+                        onClick={() => {
+                          setProfileOpen(false);
+                          navigate("/dashboard", {
+                            state: { section: "bookmarks" },
+                          });
+                        }}
                         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                       >
                         <Bookmark size={15} className="text-gray-400" />
@@ -317,7 +347,10 @@ export default function NavBar() {
           {/* Mobile search (events page only) */}
           {isEventsPage && (
             <div className="relative mb-1">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
               <input
                 type="text"
                 value={navSearch}
@@ -348,7 +381,9 @@ export default function NavBar() {
                     {initials}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900 leading-none">{user.name}</p>
+                    <p className="text-sm font-semibold text-gray-900 leading-none">
+                      {user.name}
+                    </p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {user.role === "host" ? "Event Host" : "Member"}
                     </p>
@@ -358,7 +393,10 @@ export default function NavBar() {
                 {user.role === "host" && (
                   <>
                     <button
-                      onClick={() => { setMenuOpen(false); navigate("/host", { state: { section: "events" } }); }}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        navigate("/host", { state: { section: "events" } });
+                      }}
                       className="text-left bg-green-700 text-white font-semibold px-5 py-2 rounded-full hover:bg-green-800 transition-colors"
                     >
                       Create +
@@ -383,7 +421,12 @@ export default function NavBar() {
                       Profile
                     </NavLink>
                     <button
-                      onClick={() => { setMenuOpen(false); navigate("/dashboard", { state: { section: "bookmarks" } }); }}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        navigate("/dashboard", {
+                          state: { section: "bookmarks" },
+                        });
+                      }}
                       className="text-left text-gray-700 font-medium px-5 py-2 rounded-full hover:bg-gray-200 transition-colors"
                     >
                       Bookmarks
