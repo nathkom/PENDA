@@ -9,7 +9,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="flex flex-col gap-3">
             <span className="text-white text-xl font-bold tracking-tight">
-              ThirdSpace
+              Common Grounds
             </span>
             <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
               Helping greater Seattle find the local spaces and community events
@@ -77,7 +77,7 @@ export default function Footer() {
                   <span className="block text-gray-300 font-medium">
                     General Inquiries
                   </span>
-                  hello@thirdspacefinder.org
+                  hello@commongrounds.org
                 </span>
               </li>
               <li className="flex items-start gap-2 text-sm text-gray-400">
@@ -90,7 +90,7 @@ export default function Footer() {
                   <span className="block text-gray-300 font-medium">
                     Submit an Event
                   </span>
-                  events@thirdspacefinder.org
+                  events@commongrounds.org
                 </span>
               </li>
               <li className="flex items-start gap-2 text-sm text-gray-400">

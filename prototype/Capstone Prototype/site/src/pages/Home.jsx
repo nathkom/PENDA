@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
-import { events } from "../data/events";
+import { events as staticEvents } from "../data/events";
 import { useUser } from "../context/UserContext";
 import { filterEvents } from "../utils/filters";
 import BulletinBoard from "../components/BulletinBoard";
@@ -19,14 +19,51 @@ const DEFAULT_FILTERS = {
 };
 
 export default function Home() {
-  const { user } = useUser();
+  // ===== Like + Ranking State =====
+const [sortType, setSortType] = useState("default");
+
+const [likedEvents, setLikedEvents] = useState(() => {
+  const saved = localStorage.getItem("likedEvents");
+  return saved ? JSON.parse(saved) : {};
+});
+
+const toggleLike = (eventId) => {
+  const updated = {
+    ...likedEvents,
+    [eventId]: !likedEvents[eventId],
+  };
+
+  setLikedEvents(updated);
+  localStorage.setItem("likedEvents", JSON.stringify(updated));
+};
+
+const getLikeCount = (event) => {
+  const base = event.likes || 0;
+  return likedEvents[event.id] ? base + 1 : base;
+};
+  const { user, createdEvents, deletedEventIds, editedEvents, bookmarkedEvents, toggleBookmark } = useUser();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
+  const allEvents = useMemo(() => {
+    const merged = [...createdEvents, ...staticEvents];
+    const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
+    return filtered
+      .map((e) => editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e)
+      .filter((e) => !e.attending_limit || (e.attending_count || 0) < e.attending_limit);
+  }, [createdEvents, deletedEventIds, editedEvents]);
+
   const filteredEvents = useMemo(
-    () => filterEvents(events, filters),
-    [filters]
+    () => filterEvents(allEvents, filters),
+    [allEvents, filters]
   );
+  let displayedEvents = [...filteredEvents];
+
+if (sortType === "mostLiked") {
+  displayedEvents.sort(
+    (a, b) => getLikeCount(b) - getLikeCount(a)
+  );
+}
 
   function handleClear() {
     setFilters(DEFAULT_FILTERS);
@@ -43,23 +80,35 @@ export default function Home() {
       {/* Section B — Event Feed */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Feed header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {user ? "Your Feed" : "Upcoming Events"}
-            </h2>
-          </div>
+<div className="flex items-center justify-between mb-6">
+  <h2 className="text-2xl font-bold text-gray-900">
+    {user ? "Your Feed" : "Upcoming Events"}
+  </h2>
 
-          {/* Mobile filter toggle */}
-          <button
-            className="md:hidden flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:border-green-500 transition-colors"
-            onClick={() => setMobileFilterOpen(true)}
-            aria-label="Open filters"
-          >
-            <SlidersHorizontal size={16} />
-            Filters
-          </button>
-        </div>
+  <div className="flex items-center gap-3">
+    <select
+      value={sortType}
+      onChange={(e) => setSortType(e.target.value)}
+      className="border border-gray-300 rounded-lg px-3 py-1 text-sm"
+    >
+      <option value="default">Default</option>
+      <option value="mostLiked">Most Liked</option>
+    </select>
+
+    <button
+      className="md:hidden flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:border-green-500 transition-colors"
+      onClick={() => setMobileFilterOpen(true)}
+      aria-label="Open filters"
+    >
+      <SlidersHorizontal size={16} />
+      Filters
+    </button>
+  </div>
+</div>
+        
+
+
+        
 
         <div className="flex gap-6 items-start">
           {/* Sticky sidebar filter — desktop */}
@@ -77,9 +126,17 @@ export default function Home() {
               <EmptyState />
             ) : (
               <div className="flex flex-col gap-4">
-                {filteredEvents.map((event) => (
-                  <EventCard key={event.id} event={event} />
-                ))}
+               {displayedEvents.map((event) => (
+  <EventCard
+    key={event.id}
+    event={event}
+    liked={likedEvents[event.id]}
+    likeCount={getLikeCount(event)}
+    onToggleLike={toggleLike}
+    bookmarked={bookmarkedEvents.has(event.id)}
+    onToggleBookmark={toggleBookmark}
+  />
+))}
               </div>
             )}
           </section>
