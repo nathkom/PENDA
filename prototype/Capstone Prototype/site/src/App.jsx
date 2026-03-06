@@ -6,6 +6,7 @@ import Home from "./pages/Home";
 import Neighborhoods from "./pages/Neighborhoods";
 import Events from "./pages/Events";
 import EventDetail from "./pages/EventDetail";
+import SpaceDetail from "./pages/SpaceDetail";
 import SignIn from "./pages/SignIn";
 import HostTools from "./pages/HostTools";
 import UserDashboard from "./pages/UserDashboard";
@@ -22,6 +23,7 @@ export default function App() {
               <Route path="/neighborhoods" element={<Neighborhoods />} />
               <Route path="/events" element={<Events />} />
               <Route path="/events/:id" element={<EventDetail />} />
+              <Route path="/spaces/:id" element={<SpaceDetail />} />
               <Route path="/signin" element={<SignIn />} />
               <Route path="/host" element={<HostTools />} />
               <Route path="/dashboard" element={<UserDashboard />} />

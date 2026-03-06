@@ -41,7 +41,7 @@ const getLikeCount = (event) => {
   const base = event.likes || 0;
   return likedEvents[event.id] ? base + 1 : base;
 };
-  const { user, createdEvents, deletedEventIds, editedEvents, bookmarkedEvents, toggleBookmark } = useUser();
+  const { user, createdEvents, deletedEventIds, editedEvents, bookmarkedEvents, toggleBookmark, attendingEvents } = useUser();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
@@ -50,7 +50,7 @@ const getLikeCount = (event) => {
     const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
     return filtered
       .map((e) => editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e)
-      .filter((e) => !e.attending_limit || (e.attending_count || 0) < e.attending_limit);
+      .filter((e) => !e.attending_limit || (e.attending_count || 0) + (attendingEvents.has(e.id) ? 1 : 0) < e.attending_limit);
   }, [createdEvents, deletedEventIds, editedEvents]);
 
   const filteredEvents = useMemo(
@@ -175,7 +175,7 @@ if (sortType === "mostLiked") {
             />
             <button
               onClick={() => setMobileFilterOpen(false)}
-              className="mt-4 w-full bg-green-700 text-white py-3 rounded-xl font-semibold hover:bg-green-800 transition-colors"
+              className="mt-4 w-full bg-[#9FB366] text-white py-3 rounded-xl font-semibold hover:bg-[#8a9c57] transition-colors"
             >
               Apply Filters
             </button>

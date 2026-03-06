@@ -210,7 +210,7 @@ export default function EventGallery({ images, title }) {
       <div className="flex justify-end px-4 py-2">
         <button
           onClick={() => open(0)}
-          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-green-700 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-[#9FB366] transition-colors"
           aria-label={`View all ${images.length} photos`}
         >
           <Images size={13} aria-hidden="true" />

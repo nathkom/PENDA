@@ -2,9 +2,12 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useUser } from "../context/UserContext";
+import { spaces as staticSpaces } from "../data/spaces";
+
+const ELM_SPACE = staticSpaces.find((s) => s.id === "elm-coffee-roasters");
 
 export default function SignIn() {
-  const { setUser } = useUser();
+  const { setUser, setCreatedSpaces } = useUser();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,7 +32,7 @@ export default function SignIn() {
         <div className="text-center mb-8">
           <Link
             to="/"
-            className="text-3xl font-bold text-green-700 tracking-tight"
+            className="text-3xl font-bold text-[#5F77A5] tracking-tight"
           >
             Common Grounds
           </Link>
@@ -71,7 +74,7 @@ export default function SignIn() {
                     setEmail(e.target.value);
                     setError("");
                   }}
-                  className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5F77A5]"
                 />
               </div>
             </div>
@@ -87,7 +90,7 @@ export default function SignIn() {
                 </label>
                 <button
                   type="button"
-                  className="text-xs text-green-700 hover:underline font-medium"
+                  className="text-xs text-[#5F77A5] hover:underline font-medium"
                 >
                   Forgot password?
                 </button>
@@ -108,7 +111,7 @@ export default function SignIn() {
                     setPassword(e.target.value);
                     setError("");
                   }}
-                  className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#5F77A5]"
                 />
                 <button
                   type="button"
@@ -129,7 +132,7 @@ export default function SignIn() {
             {/* Submit */}
             <button
               type="submit"
-              className="w-full bg-green-700 hover:bg-green-800 text-white font-semibold py-2.5 rounded-xl transition-colors mt-1"
+              className="w-full bg-[#5F77A5] hover:bg-[#4d6592] text-white font-semibold py-2.5 rounded-xl transition-colors mt-1"
             >
               Sign In
             </button>
@@ -152,9 +155,10 @@ export default function SignIn() {
                   email: "host@demo.com",
                   role: "host",
                 });
+                if (ELM_SPACE) setCreatedSpaces([ELM_SPACE]);
                 navigate("/host");
               }}
-              className="w-full bg-green-700 hover:bg-green-800 text-white font-semibold py-2.5 rounded-xl transition-colors"
+              className="w-full bg-[#5F77A5] hover:bg-[#4d6592] text-white font-semibold py-2.5 rounded-xl transition-colors"
             >
               Demo Host
             </button>
@@ -168,7 +172,7 @@ export default function SignIn() {
                 });
                 navigate("/");
               }}
-              className="w-full bg-green-700 hover:bg-green-800 text-white font-semibold py-2.5 rounded-xl transition-colors"
+              className="w-full bg-[#5F77A5] hover:bg-[#4d6592] text-white font-semibold py-2.5 rounded-xl transition-colors"
             >
               Demo User
             </button>
@@ -178,7 +182,7 @@ export default function SignIn() {
         {/* Sign up prompt */}
         <p className="text-center text-sm text-gray-500 mt-6">
           Don't have an account?{" "}
-          <button className="text-green-700 font-semibold hover:underline">
+          <button className="text-[#5F77A5] font-semibold hover:underline">
             Sign up
           </button>
         </p>

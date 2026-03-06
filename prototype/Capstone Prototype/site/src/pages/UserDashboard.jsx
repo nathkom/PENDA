@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { User, Bookmark, ChevronRight, Camera, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { User, Bookmark, ChevronRight, Camera, Mail, Lock, Eye, EyeOff, CalendarCheck } from "lucide-react";
 import { useUser } from "../context/UserContext";
 import { events as staticEvents } from "../data/events";
 import BookmarkedEventsSection from "../components/BookmarkedEventsSection";
+import AttendingEventsSection from "../components/AttendingEventsSection";
 
 const NAV_SECTIONS = [
-  { id: "profile",   label: "Profile",           description: "Account information", icon: User },
-  { id: "bookmarks", label: "Bookmarked Events", description: "Your saved events",   icon: Bookmark },
+  { id: "profile",   label: "Profile",           description: "Account information",  icon: User },
+  { id: "bookmarks", label: "Bookmarked Events", description: "Your saved events",    icon: Bookmark },
+  { id: "attending", label: "Attending Events",  description: "Events you're going to", icon: CalendarCheck },
 ];
 
 // ─── User Profile Section ─────────────────────────────────────────────────────
@@ -28,7 +30,7 @@ function UserProfileSection({ user, setUser }) {
     "w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500";
   const saveBtnCls = (saved) =>
     `mt-4 px-5 py-2 rounded-xl text-sm font-semibold transition-colors ${
-      saved ? "bg-green-100 text-green-700" : "bg-green-700 hover:bg-green-800 text-white"
+      saved ? "bg-green-100 text-green-700" : "bg-[#9FB366] hover:bg-[#8a9c57] text-white"
     }`;
 
   return (
@@ -37,7 +39,7 @@ function UserProfileSection({ user, setUser }) {
       <div className="p-6">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Profile Photo</h2>
         <div className="flex items-center gap-5">
-          <div className="w-20 h-20 rounded-full bg-green-700 flex items-center justify-center text-white text-2xl font-bold select-none flex-shrink-0">
+          <div className="w-20 h-20 rounded-full bg-[#9FB366] flex items-center justify-center text-white text-2xl font-bold select-none flex-shrink-0">
             {user?.name?.slice(0, 2).toUpperCase() || "U"}
           </div>
           <div>
@@ -162,6 +164,7 @@ export default function UserDashboard() {
     bookmarkedEvents, toggleBookmark,
     bookmarkGroups, addBookmarkGroup, removeBookmarkGroup,
     eventGroupMap, addEventToGroup, removeEventFromGroup,
+    attendingEvents, unmarkAttending,
   } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
@@ -185,7 +188,7 @@ export default function UserDashboard() {
 
   return (
     <main className="bg-gray-50 min-h-screen">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row gap-6">
 
           {/* ── Sidebar ── */}
@@ -198,8 +201,8 @@ export default function UserDashboard() {
                   onClick={() => setActiveSection(id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                     activeSection === id
-                      ? "bg-green-700 text-white"
-                      : "bg-white border border-gray-200 text-gray-700 hover:border-green-300"
+                      ? "bg-[#9FB366] text-white"
+                      : "bg-white border border-gray-200 text-gray-700 hover:border-[#9FB366]/50"
                   }`}
                 >
                   <Icon size={14} />
@@ -211,18 +214,18 @@ export default function UserDashboard() {
             {/* Desktop: sidebar card */}
             <div className="hidden md:block bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               {/* Profile summary */}
-              <div className="p-6 border-b border-gray-100 bg-gradient-to-br from-green-50 to-white">
+              <div className="p-6 border-b border-gray-100 bg-gradient-to-br from-[#9FB366]/10 to-white">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-green-700 text-white font-bold text-xl flex items-center justify-center flex-shrink-0 select-none">
+                  <div className="w-14 h-14 rounded-full bg-[#9FB366] text-white font-bold text-xl flex items-center justify-center flex-shrink-0 select-none">
                     {user.name?.slice(0, 2).toUpperCase() || "U"}
                   </div>
                   <div>
                     <p className="font-bold text-gray-900 text-base leading-tight">{user.name}</p>
-                    <p className="text-sm text-green-700 font-medium mt-0.5">Member</p>
+                    <p className="text-sm text-[#9FB366] font-medium mt-0.5">Member</p>
                     <p className="text-xs text-gray-400 mt-0.5">Seattle, WA</p>
                   </div>
                 </div>
-                <div className="flex gap-4 mt-4 pt-4 border-t border-green-100/60">
+                <div className="flex gap-4 mt-4 pt-4 border-t border-[#9FB366]/20">
                   <div>
                     <p className="text-lg font-bold text-gray-900">{bookmarkedEvents.size}</p>
                     <p className="text-xs text-gray-400">Saved</p>
@@ -243,19 +246,19 @@ export default function UserDashboard() {
                     key={id}
                     onClick={() => setActiveSection(id)}
                     className={`w-full flex items-center gap-4 px-5 py-4 text-left transition-colors border-b border-gray-100 last:border-0 ${
-                      active ? "bg-green-50" : "hover:bg-gray-50"
+                      active ? "bg-[#9FB366]/10" : "hover:bg-gray-50"
                     }`}
                   >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${active ? "bg-green-700" : "bg-gray-100"}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${active ? "bg-[#9FB366]" : "bg-gray-100"}`}>
                       <Icon size={18} className={active ? "text-white" : "text-gray-500"} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-semibold leading-tight ${active ? "text-green-700" : "text-gray-800"}`}>
+                      <p className={`text-sm font-semibold leading-tight ${active ? "text-[#9FB366]" : "text-gray-800"}`}>
                         {label}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">{description}</p>
                     </div>
-                    {active && <ChevronRight size={16} className="text-green-600 flex-shrink-0" />}
+                    {active && <ChevronRight size={16} className="text-[#9FB366] flex-shrink-0" />}
                   </button>
                 );
               })}
@@ -278,6 +281,13 @@ export default function UserDashboard() {
                 removeBookmarkGroup={removeBookmarkGroup}
                 addEventToGroup={addEventToGroup}
                 removeEventFromGroup={removeEventFromGroup}
+              />
+            )}
+            {activeSection === "attending" && (
+              <AttendingEventsSection
+                allEvents={allCatalogEvents}
+                attendingEvents={attendingEvents}
+                unmarkAttending={unmarkAttending}
               />
             )}
           </div>

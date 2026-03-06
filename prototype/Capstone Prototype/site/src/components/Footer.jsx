@@ -112,7 +112,7 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <div className="border-t border-gray-700 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500">
-          <span>© 2026 ThirdSpace Finder.</span>
+          <span>© 2026 Common Grounds.</span>
         </div>
       </div>
     </footer>

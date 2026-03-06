@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -9,6 +9,7 @@ import {
   Share2,
 } from "lucide-react";
 import { events as staticEvents } from "../data/events";
+import { spaces as staticSpaces } from "../data/spaces";
 import EventCard from "../components/EventCard";
 import EventGallery from "../components/EventGallery";
 import AccessibilityTags from "../components/AccessibilityTags";
@@ -25,7 +26,7 @@ const CATEGORY_LABELS = {
 
 const COST_LABEL = {
   free: "Free",
-  suggested_donation: "Suggested Donation",
+  suggested_donation: "Fundraiser",
   paid: "Paid",
 };
 
@@ -50,7 +51,7 @@ function formatDate(isoDate) {
 export default function EventDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, createdEvents, deletedEventIds, editedEvents, bookmarkedEvents, toggleBookmark } = useUser();
+  const { user, createdEvents, deletedEventIds, editedEvents, bookmarkedEvents, toggleBookmark, attendingEvents, markAttending, unmarkAttending, createdSpaces } = useUser();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -66,6 +67,18 @@ export default function EventDetail() {
   }, [createdEvents, deletedEventIds, editedEvents]);
 
   const event = allEvents.find((e) => e.id === id);
+
+  const allSpaces = useMemo(() => [...createdSpaces, ...staticSpaces], [createdSpaces]);
+  const linkedSpace = event ? allSpaces.find((s) => s.name === event.space_name) : null;
+
+  const spaceEvents = useMemo(() => {
+    if (!event) return [];
+    const matching = allEvents.filter((e) => e.space_name === event.space_name);
+    if (matching.length === 0) return [];
+    // Always show 3 cards; pad by repeating. Exclude current event only if there are other options.
+    const pool = matching.length > 1 ? matching.filter((e) => e.id !== event.id) : matching;
+    return Array.from({ length: 3 }, (_, i) => pool[i % pool.length]);
+  }, [allEvents, event]);
 
   const [likedEvents, setLikedEvents] = useState(() => {
     const saved = localStorage.getItem("likedEvents");
@@ -102,9 +115,26 @@ export default function EventDetail() {
     .filter((e) => e.neighborhood === event.neighborhood && e.id !== event.id)
     .slice(0, 3);
 
-  const costLabel = event.cost_amount
-    ? `${COST_LABEL[event.cost]} · $${event.cost_amount}`
-    : COST_LABEL[event.cost];
+  const costLabel = event.cost === "suggested_donation"
+    ? "Fundraiser"
+    : event.cost_amount
+      ? `${COST_LABEL[event.cost]} · $${event.cost_amount}`
+      : COST_LABEL[event.cost];
+
+  const isAttending = attendingEvents.has(event.id);
+  const [attendPop, setAttendPop] = useState(false);
+
+  function handleMarkAttending() {
+    if (!isAttending) {
+      markAttending(event.id);
+      setAttendPop(true);
+      setTimeout(() => setAttendPop(false), 400);
+    } else {
+      unmarkAttending(event.id);
+    }
+  }
+
+  const effectiveAttendingCount = (event.attending_count || 0) + (isAttending ? 1 : 0);
 
   return (
     <main className="bg-gray-50 min-h-screen pb-16">
@@ -113,7 +143,7 @@ export default function EventDetail() {
         {/* Back button */}
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-green-700 transition-colors mb-6"
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-[#9FB366] transition-colors mb-6"
           aria-label="Go back"
         >
           <ArrowLeft size={16} />
@@ -173,14 +203,23 @@ export default function EventDetail() {
             {/* Date / time / location */}
             <div className="px-6 pt-5 pb-2 flex flex-col gap-3">
               <div className="flex items-center gap-3 text-gray-700">
-                <Calendar size={18} className="text-green-600 shrink-0" aria-hidden="true" />
+                <Calendar size={18} className="text-[#97BFFF] shrink-0" aria-hidden="true" />
                 <span className="font-medium">
                   {formatDate(event.date)}&nbsp;&nbsp;{event.time}
                 </span>
               </div>
               <div className="flex items-center gap-3 text-gray-700">
-                <MapPin size={18} className="text-green-600 shrink-0" aria-hidden="true" />
-                <span className="font-medium">{event.space_name}, Seattle</span>
+                <MapPin size={18} className="text-[#FD858A] shrink-0" aria-hidden="true" />
+                {linkedSpace ? (
+                  <Link
+                    to={`/spaces/${linkedSpace.id}`}
+                    className="font-medium hover:text-[#9FB366] transition-colors"
+                  >
+                    {event.space_name}, Seattle
+                  </Link>
+                ) : (
+                  <span className="font-medium">{event.space_name}, Seattle</span>
+                )}
               </div>
             </div>
 
@@ -196,9 +235,9 @@ export default function EventDetail() {
             {/* What to Expect card */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
 
-              {/* Green "What to expect" header */}
-              <div className="bg-green-50 px-6 py-5 border-b border-green-100">
-                <h2 className="text-xl font-bold text-gray-900">What to expect</h2>
+              {/* What to expect header */}
+              <div className="bg-[#5F77A5] px-6 py-5 border-b border-[#4d6592]">
+                <h2 className="text-xl font-bold text-white">What to expect</h2>
               </div>
 
               {/* Key-value rows */}
@@ -247,8 +286,8 @@ export default function EventDetail() {
                   onClick={() => toggleBookmark(event.id)}
                   className={`flex items-center justify-center gap-1.5 flex-1 border font-semibold py-2.5 rounded-xl text-sm transition-colors ${
                     bookmarkedEvents.has(event.id)
-                      ? "border-green-400 bg-green-50 text-green-700"
-                      : "border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-700"
+                      ? "border-[#9FB366] bg-green-50 text-[#9FB366]"
+                      : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-700"
                   }`}
                   aria-label={bookmarkedEvents.has(event.id) ? "Remove bookmark" : "Save this event"}
                 >
@@ -256,14 +295,14 @@ export default function EventDetail() {
                   {bookmarkedEvents.has(event.id) ? "Saved" : "Save"}
                 </button>
                 <button
-                  className="flex items-center justify-center gap-1.5 flex-1 border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition-colors"
+                  className="flex items-center justify-center gap-1.5 flex-1 border border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition-colors"
                   aria-label="Add to calendar"
                 >
                   <CalendarPlus size={15} />
                   Calendar
                 </button>
                 <button
-                  className="border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-700 p-2.5 rounded-xl transition-colors"
+                  className="border border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-700 p-2.5 rounded-xl transition-colors"
                   aria-label="Share this event"
                 >
                   <Share2 size={15} />
@@ -273,30 +312,37 @@ export default function EventDetail() {
 
             {/* Attending card */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="bg-blue-50 px-6 py-5 border-b border-blue-100">
-                <h2 className="text-xl font-bold text-gray-900">Want to attend?</h2>
+              <div className="bg-[#5F77A5] px-6 py-5 border-b border-[#4d6592]">
+                <h2 className="text-xl font-bold text-white">Want to attend?</h2>
               </div>
               <div className="px-6 py-5 flex flex-col gap-4">
-                {event.attending_limit ? (
+                {event.attending_limit && event.show_attendance !== false ? (
                   <div>
                     <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="text-gray-700 font-semibold">{event.attending_count || 0} attending</span>
+                      <span className="text-gray-700 font-semibold">{effectiveAttendingCount} attending</span>
                       <span className="text-gray-400">{event.attending_limit} spots total</span>
                     </div>
                     <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-blue-500 rounded-full transition-all"
-                        style={{ width: `${Math.min(100, ((event.attending_count || 0) / event.attending_limit) * 100)}%` }}
+                        className="h-full bg-[#5F77A5] rounded-full transition-all"
+                        style={{ width: `${Math.min(100, (effectiveAttendingCount / event.attending_limit) * 100)}%` }}
                       />
                     </div>
                     <p className="text-xs text-gray-400 mt-1.5">
-                      {Math.max(0, event.attending_limit - (event.attending_count || 0))} spots remaining
+                      {Math.max(0, event.attending_limit - effectiveAttendingCount)} spots remaining
                     </p>
                   </div>
                 ) : null}
                 {user ? (
-                  <button className="w-full bg-green-700 hover:bg-green-800 text-white font-semibold py-3 rounded-xl text-sm transition-colors">
-                    Mark as Attending
+                  <button
+                    onClick={handleMarkAttending}
+                    className={`w-full font-semibold py-3 rounded-xl text-sm transition-all duration-200 ${attendPop ? "animate-pop" : ""} ${
+                      isAttending
+                        ? "bg-[#5F77A5] text-white"
+                        : "bg-[#9FB366] hover:bg-[#8a9c57] text-white"
+                    }`}
+                  >
+                    {isAttending ? "✓ You're Attending!" : "Mark as Attending"}
                   </button>
                 ) : (
                   <Link
@@ -310,6 +356,35 @@ export default function EventDetail() {
             </div>
           </div>
         </div>
+
+        {/* More events at this space */}
+        {spaceEvents.length > 0 && (
+          <section className="mt-10" aria-labelledby="space-events-heading">
+            <div className="flex items-center justify-between mb-5">
+              <h2 id="space-events-heading" className="text-xl font-bold text-gray-900">
+                More events at {event.space_name}
+              </h2>
+              {linkedSpace && (
+                <Link
+                  to={`/spaces/${linkedSpace.id}`}
+                  className="text-sm text-[#9FB366] font-semibold hover:underline"
+                >
+                  View space →
+                </Link>
+              )}
+            </div>
+            <div className="flex flex-col gap-4">
+              {spaceEvents.map((e, i) => (
+                <EventCard
+                  key={`${e.id}-${i}`}
+                  event={e}
+                  bookmarked={bookmarkedEvents.has(e.id)}
+                  onToggleBookmark={toggleBookmark}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Related events */}
         {related.length > 0 && (

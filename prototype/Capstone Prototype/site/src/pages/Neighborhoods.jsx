@@ -38,7 +38,7 @@ function NeighborhoodTile({ neighborhood, onClick }) {
       </div>
 
       {/* Name below the card */}
-      <h2 className="mt-3 text-base font-semibold text-gray-900 group-hover:text-green-700 transition-colors text-center">
+      <h2 className="mt-3 text-base font-semibold text-gray-900 group-hover:text-[#9FB366] transition-colors text-center">
         {neighborhood.name}
       </h2>
     </button>
@@ -62,7 +62,7 @@ function NeighborhoodDetail({
       {/* Back button */}
       <button
         onClick={onBack}
-        className="flex items-center gap-2 text-sm text-gray-500 hover:text-green-700 transition-colors mb-6"
+        className="flex items-center gap-2 text-sm text-gray-500 hover:text-[#9FB366] transition-colors mb-6"
         aria-label="Back to all neighborhoods"
       >
         <ArrowLeft size={16} />
@@ -127,6 +127,7 @@ export default function Neighborhoods() {
     editedEvents,
     bookmarkedEvents,
     toggleBookmark,
+    attendingEvents,
   } = useUser();
   const selectedId = searchParams.get("id");
 
@@ -137,9 +138,10 @@ export default function Neighborhoods() {
       .map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e))
       .filter(
         (e) =>
-          !e.attending_limit || (e.attending_count || 0) < e.attending_limit,
+          !e.attending_limit ||
+          (e.attending_count || 0) + (attendingEvents.has(e.id) ? 1 : 0) < e.attending_limit,
       );
-  }, [createdEvents, deletedEventIds, editedEvents]);
+  }, [createdEvents, deletedEventIds, editedEvents, attendingEvents]);
 
   const selected = selectedId
     ? neighborhoods.find((n) => n.id === selectedId)

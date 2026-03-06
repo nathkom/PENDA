@@ -35,7 +35,7 @@ export default function FilterCard({ filters, onChange, onClear }) {
         <h2 className="font-semibold text-gray-900 text-sm uppercase tracking-wide">
           Filters
           {activeCount > 0 && (
-            <span className="ml-2 bg-green-700 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="ml-2 bg-[#9FB366] text-white text-xs font-bold px-2 py-0.5 rounded-full">
               {activeCount}
             </span>
           )}
@@ -67,7 +67,7 @@ export default function FilterCard({ filters, onChange, onClear }) {
                 className="accent-green-700 w-4 h-4 rounded"
                 aria-label={`Filter by ${cat.label}`}
               />
-              <span className="text-sm text-gray-700 group-hover:text-green-700 transition-colors">
+              <span className="text-sm text-gray-700 group-hover:text-[#9FB366] transition-colors">
                 {cat.label}
               </span>
             </label>
@@ -140,7 +140,7 @@ export default function FilterCard({ filters, onChange, onClear }) {
                 className="accent-green-700 w-4 h-4"
                 aria-label={`${opt.label} price filter`}
               />
-              <span className="text-sm text-gray-700 group-hover:text-green-700 transition-colors">
+              <span className="text-sm text-gray-700 group-hover:text-[#9FB366] transition-colors">
                 {opt.label}
               </span>
             </label>
@@ -163,7 +163,7 @@ export default function FilterCard({ filters, onChange, onClear }) {
                 className="accent-green-700 w-4 h-4 rounded"
                 aria-label={`Filter by ${opt.label}`}
               />
-              <span className="text-sm text-gray-700 group-hover:text-green-700 transition-colors">
+              <span className="text-sm text-gray-700 group-hover:text-[#9FB366] transition-colors">
                 {opt.label}
               </span>
             </label>

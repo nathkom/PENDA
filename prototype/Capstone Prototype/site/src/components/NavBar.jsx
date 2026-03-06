@@ -112,12 +112,12 @@ export default function NavBar() {
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-      <nav className="max-w-6xl mx-auto px-4 h-16 flex items-center gap-2">
+      <nav className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-2">
         {/* Logo */}
         <Link
           to="/"
-          className="text-xl font-bold text-green-700 tracking-tight shrink-0"
-          aria-label="Third Space Finder home"
+          className="text-xl font-bold text-white bg-[#5F77A5] px-3 py-1.5 rounded-lg tracking-tight shrink-0"
+          aria-label="Common Grounds home"
         >
           Common Grounds
         </Link>
@@ -139,7 +139,7 @@ export default function NavBar() {
           >
             <div
               aria-hidden="true"
-              className="absolute top-1 bottom-1 bg-gray-900 rounded-full pointer-events-none"
+              className="absolute top-1 bottom-1 bg-[#5F77A5] rounded-full pointer-events-none"
               style={{
                 left: sliderStyle.left,
                 width: sliderStyle.width,
@@ -234,7 +234,7 @@ export default function NavBar() {
               onClick={() =>
                 navigate("/host", { state: { section: "events" } })
               }
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-green-700 hover:bg-green-800 text-white text-sm font-semibold transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm font-semibold transition-colors"
               aria-label="Create a new event"
             >
               Create +
@@ -246,7 +246,7 @@ export default function NavBar() {
             <div ref={profileRef} className="relative">
               <button
                 onClick={() => setProfileOpen((v) => !v)}
-                className="w-9 h-9 rounded-full bg-green-700 text-white font-bold text-sm flex items-center justify-center hover:bg-green-800 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                className="w-9 h-9 rounded-full bg-[#9FB366] text-white font-bold text-sm flex items-center justify-center hover:bg-[#8a9c57] transition-colors focus:outline-none focus:ring-2 focus:ring-[#9FB366] focus:ring-offset-2"
                 aria-label="Profile menu"
                 aria-expanded={profileOpen}
               >
@@ -321,7 +321,7 @@ export default function NavBar() {
           ) : (
             <Link
               to="/signin"
-              className="flex items-center gap-2 px-4 py-2 rounded-full border border-green-700 text-green-700 text-sm font-medium hover:bg-green-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#5F77A5] text-[#5F77A5] text-sm font-medium hover:bg-[#5F77A5]/10 transition-colors"
               aria-label="Sign in"
             >
               <User size={16} />
@@ -332,7 +332,7 @@ export default function NavBar() {
 
         {/* Mobile hamburger */}
         <button
-          className="md:hidden p-2 rounded-md text-gray-700 hover:text-green-700 ml-auto"
+          className="md:hidden p-2 rounded-md text-gray-700 hover:text-[#9FB366] ml-auto"
           onClick={() => setMenuOpen(!menuOpen)}
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
@@ -377,7 +377,7 @@ export default function NavBar() {
             {user ? (
               <>
                 <div className="flex items-center gap-3 px-3 py-1.5">
-                  <div className="w-8 h-8 rounded-full bg-green-700 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-[#9FB366] text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
                     {initials}
                   </div>
                   <div>
@@ -397,7 +397,7 @@ export default function NavBar() {
                         setMenuOpen(false);
                         navigate("/host", { state: { section: "events" } });
                       }}
-                      className="text-left bg-green-700 text-white font-semibold px-5 py-2 rounded-full hover:bg-green-800 transition-colors"
+                      className="text-left bg-[#9FB366] text-white font-semibold px-5 py-2 rounded-full hover:bg-[#8a9c57] transition-colors"
                     >
                       Create +
                     </button>
@@ -444,7 +444,7 @@ export default function NavBar() {
             ) : (
               <Link
                 to="/signin"
-                className="flex items-center gap-2 px-4 py-2 rounded-full border border-green-700 text-green-700 text-sm font-medium w-fit hover:bg-green-50 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#5F77A5] text-[#5F77A5] text-sm font-medium w-fit hover:bg-[#5F77A5]/10 transition-colors"
                 onClick={() => setMenuOpen(false)}
               >
                 <User size={16} />

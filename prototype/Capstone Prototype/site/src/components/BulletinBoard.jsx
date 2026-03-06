@@ -9,7 +9,7 @@ export default function BulletinBoard() {
           <img
             src="/images/bulletin-board.png"
             alt="Bulletin Board of the Month"
-            className="w-full max-w-6xl rounded-2xl shadow-lg"
+            className="w-full rounded-2xl shadow-lg"
           />
         </div>
       </div>

@@ -3,12 +3,13 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   User, FileText, Calendar, Camera, Building2, Mail, Lock,
   Globe, Plus, Edit2, Eye, EyeOff, ChevronRight,
-  Upload, MapPin, X, Check, Trash2, Bookmark,
+  Upload, MapPin, X, Check, Trash2, Bookmark, CalendarCheck,
 } from "lucide-react";
 import { useUser } from "../context/UserContext";
 import { events as staticEvents } from "../data/events";
 import { NEIGHBORHOODS } from "../utils/filters";
 import BookmarkedEventsSection from "../components/BookmarkedEventsSection";
+import AttendingEventsSection from "../components/AttendingEventsSection";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -134,6 +135,7 @@ const CATEGORY_TO_IMAGE = {
 const BLANK_FORM = {
   title: "",
   space_name: "",
+  selectedSpaceId: "",
   neighborhood: "",
   category: "social",
   description: "",
@@ -150,6 +152,7 @@ const BLANK_FORM = {
   accessibility: [],
   tagsInput: "",
   attending_limit: null,
+  show_attendance: true,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -210,12 +213,14 @@ function eventToForm(event) {
     accessibility: event.accessibility ? [...event.accessibility] : [],
     tagsInput: event.tags ? event.tags.join(", ") : "",
     attending_limit: event.attending_limit ?? null,
+    show_attendance: event.show_attendance !== false,
+    selectedSpaceId: "",
   };
 }
 
 // ─── Create / Edit Event View ─────────────────────────────────────────────────
 
-function CreateEventView({ editingEvent, templates, onCancel, onPublish, onSaveTemplate }) {
+function CreateEventView({ editingEvent, templates, createdSpaces = [], onCancel, onPublish, onSaveTemplate }) {
   const isEditing = Boolean(editingEvent);
 
   const [form, setForm] = useState(() =>
@@ -303,6 +308,7 @@ function CreateEventView({ editingEvent, templates, onCancel, onPublish, onSaveT
       space_format: form.space_format || "Open format",
       crowd_level: form.crowd_level || 50,
       attending_limit: form.attending_limit || null,
+      show_attendance: form.show_attendance,
       attending_count: isEditing ? (editingEvent.attending_count || 0) : 0,
     });
   }
@@ -457,13 +463,46 @@ function CreateEventView({ editingEvent, templates, onCancel, onPublish, onSaveT
                 <h3 className="text-white font-bold text-xl mb-3 flex items-center gap-2">
                   <MapPin size={18} /> Location
                 </h3>
-                <input
-                  type="text"
-                  value={form.space_name}
-                  onChange={(e) => setForm((f) => ({ ...f, space_name: e.target.value }))}
-                  placeholder="Enter the venue name and address."
-                  className={inputCls + " mb-3"}
-                />
+                {createdSpaces.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-blue-100 text-xs mb-1.5">Select a space you manage</p>
+                    <select
+                      value={form.selectedSpaceId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "__other__" || val === "") {
+                          setForm((f) => ({ ...f, selectedSpaceId: val }));
+                        } else {
+                          const s = createdSpaces.find((x) => x.id === val);
+                          if (s) {
+                            setForm((f) => ({
+                              ...f,
+                              selectedSpaceId: val,
+                              space_name: s.name,
+                              neighborhood: s.neighborhood || f.neighborhood,
+                            }));
+                          }
+                        }
+                      }}
+                      className={darkSelectCls + " w-full"}
+                    >
+                      <option value="">Select a space…</option>
+                      {createdSpaces.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                      <option value="__other__">Other (enter manually)</option>
+                    </select>
+                  </div>
+                )}
+                {(createdSpaces.length === 0 || form.selectedSpaceId === "__other__" || form.selectedSpaceId === "") && (
+                  <input
+                    type="text"
+                    value={form.space_name}
+                    onChange={(e) => setForm((f) => ({ ...f, space_name: e.target.value }))}
+                    placeholder="Enter the venue name and address."
+                    className={inputCls + " mb-3"}
+                  />
+                )}
                 <select
                   value={form.neighborhood}
                   onChange={(e) => setForm((f) => ({ ...f, neighborhood: e.target.value }))}
@@ -677,29 +716,59 @@ function CreateEventView({ editingEvent, templates, onCancel, onPublish, onSaveT
 
             {/* 9. Attending Limit */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-              <h3 className="font-bold text-gray-900 text-lg mb-1">Attending Limit</h3>
+              <h3 className="font-bold text-gray-900 text-lg mb-1">Attendance Settings</h3>
               <p className="text-sm text-gray-500 mb-4">
-                Set a maximum number of attendees. Leave blank for unlimited attendance.
+                Set a maximum number of attendees and control what attendees see.
               </p>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-semibold text-gray-700">Max Attendees</label>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={form.attending_limit ?? ""}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      attending_limit: e.target.value ? parseInt(e.target.value) : null,
-                    }))
-                  }
-                  placeholder="e.g. 20"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-                <p className="text-xs text-gray-400">
-                  Once capacity is reached, the event will be hidden from listings.
-                </p>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-semibold text-gray-700">Max Attendees</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={form.attending_limit ?? ""}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        attending_limit: e.target.value ? parseInt(e.target.value) : null,
+                      }))
+                    }
+                    placeholder="e.g. 20"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <p className="text-xs text-gray-400">
+                    Leave blank for unlimited attendance.
+                  </p>
+                </div>
+
+                {/* Show attendance metrics toggle */}
+                <div className="flex items-center justify-between gap-4 py-3 border-t border-gray-100">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Show attendance metrics</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {form.show_attendance
+                        ? "Attendees will see the capacity bar and spots remaining."
+                        : "Attendees only see the confirmation animation — no counts shown."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, show_attendance: !f.show_attendance }))}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${
+                      form.show_attendance ? "bg-[#9FB366]" : "bg-gray-300"
+                    }`}
+                    role="switch"
+                    aria-checked={form.show_attendance}
+                    aria-label="Show attendance metrics"
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        form.show_attendance ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -737,7 +806,7 @@ function CreateEventView({ editingEvent, templates, onCancel, onPublish, onSaveT
         <button
           type="button"
           onClick={handlePublish}
-          className="px-8 py-2.5 rounded-full bg-green-700 hover:bg-green-800 text-white font-semibold text-sm transition-colors"
+          className="px-8 py-2.5 rounded-full bg-[#9FB366] hover:bg-[#8a9c57] text-white font-semibold text-sm transition-colors"
         >
           {isEditing ? "Save Changes" : "Publish"}
         </button>
@@ -768,7 +837,7 @@ function ProfileSection({ user, setUser }) {
     "w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500";
   const saveBtnCls = (saved) =>
     `mt-4 px-5 py-2 rounded-xl text-sm font-semibold transition-colors ${
-      saved ? "bg-green-100 text-green-700" : "bg-green-700 hover:bg-green-800 text-white"
+      saved ? "bg-green-100 text-green-700" : "bg-[#9FB366] hover:bg-[#8a9c57] text-white"
     }`;
 
   return (
@@ -777,7 +846,7 @@ function ProfileSection({ user, setUser }) {
       <div className="p-6">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Profile Photo</h2>
         <div className="flex items-center gap-5">
-          <div className="w-20 h-20 rounded-full bg-green-700 flex items-center justify-center text-white text-2xl font-bold select-none flex-shrink-0">
+          <div className="w-20 h-20 rounded-full bg-[#9FB366] flex items-center justify-center text-white text-2xl font-bold select-none flex-shrink-0">
             {user?.name?.slice(0, 2).toUpperCase() || "DH"}
           </div>
           <div>
@@ -927,7 +996,7 @@ function TemplatesSection({ templates, onCreateTemplate }) {
         </div>
         <button
           onClick={onCreateTemplate}
-          className="flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
+          className="flex items-center gap-2 bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
         >
           <Plus size={14} />
           New Template
@@ -955,7 +1024,7 @@ function TemplatesSection({ templates, onCreateTemplate }) {
                 <Edit2 size={13} /> Edit
               </button>
               <button onClick={onCreateTemplate}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-700 hover:bg-green-800 text-white text-sm transition-colors font-medium">
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm transition-colors font-medium">
                 Use
               </button>
             </div>
@@ -996,7 +1065,7 @@ function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent }
         </div>
         <button
           onClick={onCreateEvent}
-          className="flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
+          className="flex items-center gap-2 bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
         >
           <Plus size={14} />
           Create Event
@@ -1090,25 +1159,413 @@ function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent }
   );
 }
 
+// ─── Create Space View ────────────────────────────────────────────────────────
+
+const SPACE_CATEGORIES = ["Café", "Park", "Gallery", "Community Center", "Library", "Brewery", "Other"];
+
+const BLANK_SPACE_FORM = {
+  name: "",
+  address: "",
+  neighborhood: "",
+  category: "Café",
+  description: "",
+  hours: "",
+  capacity: "",
+  website: "",
+  amenities: [],
+};
+
+function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
+  const isEditing = Boolean(editingSpace);
+  const [form, setForm] = useState(() =>
+    isEditing
+      ? {
+          name: editingSpace.name || "",
+          address: editingSpace.address || "",
+          neighborhood: editingSpace.neighborhood || "",
+          category: editingSpace.category || "Café",
+          description: editingSpace.description || "",
+          hours: editingSpace.hours || "",
+          capacity: editingSpace.capacity ? String(editingSpace.capacity) : "",
+          website: editingSpace.website || "",
+          amenities: editingSpace.amenities ? [...editingSpace.amenities] : [],
+        }
+      : { ...BLANK_SPACE_FORM }
+  );
+  const [imagePreview, setImagePreview] = useState(
+    isEditing ? (editingSpace.image_url || null) : null
+  );
+  const [publishError, setPublishError] = useState("");
+  const imageInputRef = useRef(null);
+
+  function handleImageUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  function handlePublish() {
+    if (!form.name.trim()) { setPublishError("Please add a space name before publishing."); return; }
+    setPublishError("");
+    const base = isEditing ? editingSpace : {};
+    onPublish({
+      ...base,
+      id: isEditing ? editingSpace.id : `space-custom-${Date.now()}`,
+      name: form.name.trim(),
+      address: form.address,
+      neighborhood: form.neighborhood,
+      category: form.category,
+      description: form.description,
+      hours: form.hours,
+      capacity: form.capacity ? parseInt(form.capacity) : null,
+      website: form.website,
+      amenities: form.amenities,
+      image_url: imagePreview || (isEditing ? editingSpace.image_url : "/images/headway-F2KRf_QfCqw-unsplash.jpg"),
+      gallery_images: imagePreview
+        ? [{ url: imagePreview, alt: form.name }]
+        : (isEditing ? editingSpace.gallery_images : []),
+      noise_level: base.noise_level || "",
+      space_format: base.space_format || "",
+    });
+  }
+
+  const C = "bg-[#6c7fc4]";
+  const inputCls =
+    "w-full bg-transparent text-white placeholder:text-blue-200/60 border-b border-white/25 pb-1.5 outline-none focus:border-white/70 transition-colors text-sm";
+  const darkSelectCls =
+    "bg-[#5a6daa] text-white text-sm border border-white/25 rounded-lg px-2.5 py-1.5 outline-none focus:border-white/60";
+
+  return (
+    <div className="flex flex-col bg-stone-100" style={{ height: "calc(100vh - 64px)" }}>
+      <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="max-w-2xl mx-auto flex flex-col gap-4">
+
+          {/* Edit mode banner */}
+          {isEditing && (
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+              <Edit2 size={14} className="text-amber-600 flex-shrink-0" />
+              <p className="text-sm text-amber-700">
+                Editing: <span className="font-semibold">{editingSpace.name}</span>
+              </p>
+            </div>
+          )}
+
+          {/* Image upload */}
+          <div
+            onClick={() => imageInputRef.current?.click()}
+            className={`${C} rounded-2xl overflow-hidden cursor-pointer hover:opacity-95 transition-opacity flex flex-col items-center justify-center min-h-[170px]`}
+          >
+            {imagePreview ? (
+              <div className="relative w-full">
+                <img src={imagePreview} alt="Space preview" className="w-full h-52 object-cover" />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity">
+                  <p className="text-white font-semibold text-sm flex items-center gap-2">
+                    <Upload size={16} /> Change Image
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+                <Upload size={36} className="text-white mb-3" />
+                <h3 className="text-white font-bold text-2xl">Add Space Image</h3>
+                <p className="text-blue-100 text-sm mt-1">Upload a photo of your venue.</p>
+              </div>
+            )}
+            <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+          </div>
+
+          {/* Space Name */}
+          <div className={`${C} rounded-2xl p-6`}>
+            <h3 className="text-white font-bold text-2xl mb-3">Space Name</h3>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Elm Coffee Roasters"
+              className={inputCls + " text-base"}
+            />
+          </div>
+
+          {/* Address + Neighborhood */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className={`${C} rounded-2xl p-6`}>
+              <h3 className="text-white font-bold text-xl mb-3 flex items-center gap-2">
+                <MapPin size={18} /> Address
+              </h3>
+              <input
+                type="text"
+                value={form.address}
+                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                placeholder="Street address"
+                className={inputCls + " mb-3"}
+              />
+              <select
+                value={form.neighborhood}
+                onChange={(e) => setForm((f) => ({ ...f, neighborhood: e.target.value }))}
+                className={darkSelectCls + " w-full"}
+              >
+                <option value="">Select neighborhood</option>
+                {NEIGHBORHOODS.map((n) => (
+                  <option key={n.id} value={n.name}>{n.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className={`${C} rounded-2xl p-6`}>
+              <h3 className="text-white font-bold text-xl mb-3">Details</h3>
+              <p className="text-blue-100 text-xs mb-2">Category</p>
+              <select
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                className={darkSelectCls + " w-full mb-3"}
+              >
+                {SPACE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <p className="text-blue-100 text-xs mb-2">Capacity</p>
+              <input
+                type="number"
+                min="1"
+                value={form.capacity}
+                onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
+                placeholder="e.g. 50"
+                className={darkSelectCls + " w-full"}
+              />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className={`${C} rounded-2xl p-6`}>
+            <h3 className="text-white font-bold text-xl mb-1">✏️ Description</h3>
+            <p className="text-blue-100 text-sm mb-3">
+              Describe your space for hosts and attendees.
+            </p>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="Write a brief description of this space…"
+              rows={4}
+              className="w-full bg-transparent text-white placeholder:text-blue-200/55 resize-none outline-none text-sm leading-relaxed"
+            />
+          </div>
+
+          {/* Hours + Website */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h3 className="font-bold text-gray-900 text-lg mb-4">More Info</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold text-gray-700">Hours</label>
+                <input
+                  type="text"
+                  value={form.hours}
+                  onChange={(e) => setForm((f) => ({ ...f, hours: e.target.value }))}
+                  placeholder="Mon–Fri 8 AM – 5 PM"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold text-gray-700">Website</label>
+                <input
+                  type="text"
+                  value={form.website}
+                  onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+                  placeholder="example.com"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Amenities */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h3 className="font-bold text-gray-900 text-lg mb-4">Amenities</h3>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: "wheelchair_accessible", label: "♿ Wheelchair Accessible" },
+                { id: "gender_neutral_restroom", label: "🚻 Gender-Neutral Restroom" },
+                { id: "sensory_friendly", label: "🔇 Sensory Friendly" },
+                { id: "dog_friendly", label: "🐕 Dog Friendly" },
+                { id: "wifi", label: "📶 Wi-Fi" },
+              ].map((opt) => {
+                const on = form.amenities.includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        amenities: on
+                          ? f.amenities.filter((a) => a !== opt.id)
+                          : [...f.amenities, opt.id],
+                      }))
+                    }
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                      on
+                        ? "bg-green-700 text-white border-green-700"
+                        : "text-gray-600 border-gray-200 hover:border-green-400"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {publishError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+              {publishError}
+            </div>
+          )}
+
+          <div className="h-4" />
+        </div>
+      </div>
+
+      {/* Bottom action bar */}
+      <div className="bg-stone-100 border-t border-stone-300 px-8 py-4 flex justify-center gap-4 flex-shrink-0">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-8 py-2.5 rounded-full bg-stone-300 hover:bg-stone-400 text-stone-800 font-semibold text-sm transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handlePublish}
+          className="px-8 py-2.5 rounded-full bg-[#9FB366] hover:bg-[#8a9c57] text-white font-semibold text-sm transition-colors"
+        >
+          {isEditing ? "Save Changes" : "Publish Space"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Spaces Section ───────────────────────────────────────────────────────────
+
+function SpaceCard({ space, onEdit, onDelete }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex items-center gap-4">
+      <img
+        src={space.image_url || "/images/headway-F2KRf_QfCqw-unsplash.jpg"}
+        alt={space.name}
+        className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-2 mb-0.5">
+          <h3 className="font-semibold text-gray-900 text-sm truncate">{space.name}</h3>
+          {space.category && (
+            <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+              {space.category}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 truncate">{space.address}</p>
+        <p className="text-xs text-gray-400 mt-0.5">{space.neighborhood}</p>
+      </div>
+      <div className="flex gap-2 flex-shrink-0">
+        <button
+          onClick={onEdit}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+        >
+          <Edit2 size={13} />
+          <span className="hidden sm:inline">Edit</span>
+        </button>
+        <Link
+          to={`/spaces/${space.id}`}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition-colors font-medium"
+        >
+          <Eye size={13} />
+          <span className="hidden sm:inline">View</span>
+        </Link>
+        <button
+          onClick={onDelete}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm transition-colors font-medium"
+        >
+          <Trash2 size={13} />
+          <span className="hidden sm:inline">Delete</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SpacesSection({ createdSpaces, onCreateSpace, onEditSpace, onDeleteSpace }) {
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Spaces</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {createdSpaces.length} space{createdSpaces.length !== 1 ? "s" : ""} created
+          </p>
+        </div>
+        <button
+          onClick={onCreateSpace}
+          className="flex items-center gap-2 bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
+        >
+          <Plus size={14} />
+          Create Space
+        </button>
+      </div>
+
+      {createdSpaces.length === 0 ? (
+        <div className="bg-gray-50 rounded-2xl border border-dashed border-gray-300 p-8 flex flex-col items-center text-center gap-2">
+          <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
+            <Building2 size={20} className="text-gray-400" />
+          </div>
+          <p className="text-sm font-semibold text-gray-700 mt-1">No spaces yet</p>
+          <p className="text-xs text-gray-400 max-w-xs">
+            Create a space to promote your venue and link it to events you host.
+          </p>
+          <button
+            onClick={onCreateSpace}
+            className="mt-2 px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+          >
+            Create Space
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {createdSpaces.map((space) => (
+            <SpaceCard
+              key={space.id}
+              space={space}
+              onEdit={() => onEditSpace(space)}
+              onDelete={() => onDeleteSpace(space.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const NAV_SECTIONS = [
   { id: "profile",   label: "Profile",           description: "Account & company info",  icon: User },
   { id: "templates", label: "Templates",         description: "Reusable event formats",  icon: FileText },
+  { id: "spaces",    label: "Spaces",            description: "Manage your venues",      icon: Building2 },
   { id: "events",    label: "Your Events",       description: "Manage your listings",    icon: Calendar },
   { id: "bookmarks", label: "Bookmarked Events", description: "Your saved events",       icon: Bookmark },
+  { id: "attending", label: "Attending Events",  description: "Events you're going to",  icon: CalendarCheck },
 ];
 
 export default function HostTools() {
-  const { user, setUser, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, deleteEvent, updateEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup } = useUser();
+  const { user, setUser, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, deleteEvent, updateEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, deleteCreatedSpace, updateCreatedSpace } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const [activeSection, setActiveSection] = useState(() => {
     const s = location.state?.section;
-    return s === "events" || s === "templates" || s === "profile" ? s : "profile";
+    return ["events", "templates", "spaces", "profile", "bookmarks", "attending"].includes(s) ? s : "profile";
   });
   const [createEventOpen, setCreateEventOpen] = useState(false);
+  const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
+  const [editingSpace, setEditingSpace] = useState(null);
   const [templates, setTemplates] = useState(INITIAL_TEMPLATES);
 
   useEffect(() => {
@@ -1153,11 +1610,38 @@ export default function HostTools() {
     return filtered.map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e));
   }, [createdEvents, deletedEventIds, editedEvents]);
 
+  function handlePublishSpace(spaceData) {
+    if (editingSpace) {
+      updateCreatedSpace(editingSpace.id, spaceData);
+    } else {
+      addCreatedSpace(spaceData);
+    }
+    setCreateSpaceOpen(false);
+    setEditingSpace(null);
+    setActiveSection("spaces");
+  }
+
+  function handleEditSpace(space) {
+    setEditingSpace(space);
+    setCreateSpaceOpen(true);
+  }
+
+  if (createSpaceOpen) {
+    return (
+      <CreateSpaceView
+        editingSpace={editingSpace}
+        onCancel={() => { setCreateSpaceOpen(false); setEditingSpace(null); }}
+        onPublish={handlePublishSpace}
+      />
+    );
+  }
+
   if (createEventOpen) {
     return (
       <CreateEventView
         editingEvent={editingEvent}
         templates={templates}
+        createdSpaces={createdSpaces}
         onCancel={handleCancelCreate}
         onPublish={handlePublish}
         onSaveTemplate={(tpl) => setTemplates((prev) => [...prev, tpl])}
@@ -1167,7 +1651,7 @@ export default function HostTools() {
 
   return (
     <main className="bg-gray-50 min-h-screen">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row gap-6">
 
           {/* ── Sidebar ── */}
@@ -1180,8 +1664,8 @@ export default function HostTools() {
                   onClick={() => setActiveSection(id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                     activeSection === id
-                      ? "bg-green-700 text-white"
-                      : "bg-white border border-gray-200 text-gray-700 hover:border-green-300"
+                      ? "bg-[#9FB366] text-white"
+                      : "bg-white border border-gray-200 text-gray-700 hover:border-[#9FB366]/50"
                   }`}
                 >
                   <Icon size={14} />
@@ -1193,26 +1677,26 @@ export default function HostTools() {
             {/* Desktop: sidebar card */}
             <div className="hidden md:block bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               {/* Profile summary */}
-              <div className="p-6 border-b border-gray-100 bg-gradient-to-br from-green-50 to-white">
+              <div className="p-6 border-b border-gray-100 bg-gradient-to-br from-[#9FB366]/10 to-white">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-green-700 text-white font-bold text-xl flex items-center justify-center flex-shrink-0 select-none">
+                  <div className="w-14 h-14 rounded-full bg-[#9FB366] text-white font-bold text-xl flex items-center justify-center flex-shrink-0 select-none">
                     {user.name?.slice(0, 2).toUpperCase() || "DH"}
                   </div>
                   <div>
                     <p className="font-bold text-gray-900 text-base leading-tight">{user.name}</p>
-                    <p className="text-sm text-green-700 font-medium mt-0.5">Event Host</p>
+                    <p className="text-sm text-[#9FB366] font-medium mt-0.5">Event Host</p>
                     <p className="text-xs text-gray-400 mt-0.5">Seattle, WA</p>
                   </div>
                 </div>
-                <div className="flex gap-4 mt-4 pt-4 border-t border-green-100/60">
+                <div className="flex gap-4 mt-4 pt-4 border-t border-[#9FB366]/20">
                   <div>
                     <p className="text-lg font-bold text-gray-900">{allHostEvents.length}</p>
                     <p className="text-xs text-gray-400">Events</p>
                   </div>
                   <div className="w-px bg-gray-200" />
                   <div>
-                    <p className="text-lg font-bold text-gray-900">{templates.length}</p>
-                    <p className="text-xs text-gray-400">Templates</p>
+                    <p className="text-lg font-bold text-gray-900">{createdSpaces.length}</p>
+                    <p className="text-xs text-gray-400">Spaces</p>
                   </div>
                   <div className="w-px bg-gray-200" />
                   <div>
@@ -1230,19 +1714,19 @@ export default function HostTools() {
                     key={id}
                     onClick={() => setActiveSection(id)}
                     className={`w-full flex items-center gap-4 px-5 py-4 text-left transition-colors border-b border-gray-100 last:border-0 ${
-                      active ? "bg-green-50" : "hover:bg-gray-50"
+                      active ? "bg-[#9FB366]/10" : "hover:bg-gray-50"
                     }`}
                   >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${active ? "bg-green-700" : "bg-gray-100"}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${active ? "bg-[#9FB366]" : "bg-gray-100"}`}>
                       <Icon size={18} className={active ? "text-white" : "text-gray-500"} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-semibold leading-tight ${active ? "text-green-700" : "text-gray-800"}`}>
+                      <p className={`text-sm font-semibold leading-tight ${active ? "text-[#9FB366]" : "text-gray-800"}`}>
                         {label}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">{description}</p>
                     </div>
-                    {active && <ChevronRight size={16} className="text-green-600 flex-shrink-0" />}
+                    {active && <ChevronRight size={16} className="text-[#9FB366] flex-shrink-0" />}
                   </button>
                 );
               })}
@@ -1256,6 +1740,14 @@ export default function HostTools() {
               <TemplatesSection
                 templates={templates}
                 onCreateTemplate={() => { setEditingEvent(null); setCreateEventOpen(true); }}
+              />
+            )}
+            {activeSection === "spaces" && (
+              <SpacesSection
+                createdSpaces={createdSpaces}
+                onCreateSpace={() => { setEditingSpace(null); setCreateSpaceOpen(true); }}
+                onEditSpace={handleEditSpace}
+                onDeleteSpace={deleteCreatedSpace}
               />
             )}
             {activeSection === "events" && (
@@ -1277,6 +1769,13 @@ export default function HostTools() {
                 removeBookmarkGroup={removeBookmarkGroup}
                 addEventToGroup={addEventToGroup}
                 removeEventFromGroup={removeEventFromGroup}
+              />
+            )}
+            {activeSection === "attending" && (
+              <AttendingEventsSection
+                allEvents={allCatalogEvents}
+                attendingEvents={attendingEvents}
+                unmarkAttending={unmarkAttending}
               />
             )}
           </div>
