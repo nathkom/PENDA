@@ -9,7 +9,7 @@ const COST_BADGE = {
 
 const COST_LABEL = {
   free: "Free",
-  suggested_donation: "Donation",
+  suggested_donation: "Fundraiser",
   paid: "Paid",
 };
 
@@ -47,7 +47,7 @@ function FeedCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
 
           {/* Title + like button */}
           <div className="flex items-start gap-2">
-            <h3 className="flex-1 text-lg font-bold text-gray-900 leading-tight line-clamp-1 group-hover:text-green-700 transition-colors">
+            <h3 className="flex-1 text-lg font-bold text-gray-900 leading-tight line-clamp-1 group-hover:text-[#9FB366] transition-colors">
               {event.title}
             </h3>
             <button
@@ -65,19 +65,19 @@ function FeedCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
             {event.date && (
               <span className="flex items-center gap-1">
-                <Calendar size={11} className="text-green-600 shrink-0" />
+                <Calendar size={11} className="text-[#97BFFF] shrink-0" />
                 {formatDate(event.date)}
               </span>
             )}
             {event.time && (
               <span className="flex items-center gap-1">
-                <Clock size={11} className="text-green-600 shrink-0" />
+                <Clock size={11} className="text-[#FFA86C] shrink-0" />
                 {event.time}
               </span>
             )}
             {event.space_name && (
               <span className="flex items-center gap-1 truncate">
-                <MapPin size={11} className="text-green-600 shrink-0" />
+                <MapPin size={11} className="text-[#FD858A] shrink-0" />
                 <span className="truncate">{event.space_name}, Seattle</span>
               </span>
             )}
@@ -93,13 +93,13 @@ function FeedCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
           {/* Tags + action buttons — pushed to bottom */}
           <div className="flex items-center justify-between mt-auto gap-2">
             <div className="flex flex-wrap gap-1 min-w-0 overflow-hidden">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${costClass}`}>
+              <span className={`text-sm px-3 py-1 rounded-full font-semibold ${costClass}`}>
                 {costLabel}
               </span>
               {event.tags?.slice(0, 2).map((tag) => (
                 <span
                   key={tag}
-                  className="text-xs px-2 py-0.5 rounded-full border border-green-300 text-green-700 capitalize whitespace-nowrap"
+                  className="text-sm px-3 py-1 rounded-full border border-green-300 text-green-700 capitalize whitespace-nowrap"
                 >
                   {tag.replace(/_/g, " ")}
                 </span>
@@ -113,26 +113,26 @@ function FeedCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
             >
               <button
                 onClick={() => onToggleBookmark?.(event.id)}
-                className={`p-1.5 rounded-lg border transition-colors ${
+                className={`p-2.5 rounded-lg border transition-colors ${
                   bookmarked
-                    ? "border-green-400 text-green-700 bg-green-50"
-                    : "border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-500"
+                    ? "border-[#9FB366] text-[#9FB366] bg-green-50"
+                    : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500"
                 }`}
                 aria-label={bookmarked ? "Remove bookmark" : "Bookmark event"}
               >
-                <Bookmark size={13} />
+                <Bookmark size={16} />
               </button>
               <button
-                className="p-1.5 rounded-lg border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-500 transition-colors"
+                className="p-2.5 rounded-lg border border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500 transition-colors"
                 aria-label="Add to calendar"
               >
-                <CalendarPlus size={13} />
+                <CalendarPlus size={16} />
               </button>
               <button
-                className="p-1.5 rounded-lg border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-500 transition-colors"
+                className="p-2.5 rounded-lg border border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500 transition-colors"
                 aria-label="Share event"
               >
-                <Share2 size={13} />
+                <Share2 size={16} />
               </button>
             </div>
           </div>
@@ -163,7 +163,7 @@ function GridCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
       {/* Content */}
       <div className="flex flex-col gap-2 p-4 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-bold text-gray-900 text-base leading-snug group-hover:text-green-700 transition-colors line-clamp-2 flex-1">
+          <h3 className="font-bold text-gray-900 text-base leading-snug group-hover:text-[#9FB366] transition-colors line-clamp-2 flex-1">
             {event.title}
           </h3>
           <button
@@ -178,15 +178,15 @@ function GridCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
         </div>
 
         <div className="flex items-center gap-1.5 text-xs text-gray-500">
-          <Calendar size={12} className="text-blue-500" aria-hidden="true" />
+          <Calendar size={12} className="text-[#97BFFF]" aria-hidden="true" />
           <span>{formatDate(event.date)}</span>
           <span className="mx-0.5">·</span>
-          <Clock size={12} className="text-orange-500" aria-hidden="true" />
+          <Clock size={12} className="text-[#FFA86C]" aria-hidden="true" />
           <span>{event.time}</span>
         </div>
 
         <div className="flex items-center gap-1.5 text-xs text-gray-500">
-          <MapPin size={12} className="text-red-500" aria-hidden="true" />
+          <MapPin size={12} className="text-[#FD858A]" aria-hidden="true" />
           <span className="truncate">
             {event.space_name} · {event.neighborhood}
           </span>
@@ -201,7 +201,7 @@ function GridCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
             {event.tags?.slice(0, 3).map((tag) => (
               <span
                 key={tag}
-                className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full capitalize font-medium whitespace-nowrap"
+                className="text-sm bg-green-50 text-green-700 px-3 py-1 rounded-full capitalize font-medium whitespace-nowrap"
               >
                 {tag.replace(/_/g, " ")}
               </span>
@@ -210,14 +210,14 @@ function GridCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
           <div className="flex gap-1 shrink-0" onClick={(e) => e.preventDefault()}>
             <button
               onClick={() => onToggleBookmark?.(event.id)}
-              className={`p-1.5 rounded-lg border transition-colors ${
+              className={`p-2.5 rounded-lg border transition-colors ${
                 bookmarked
-                  ? "border-green-400 text-green-700 bg-green-50"
-                  : "border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-500"
+                  ? "border-[#9FB366] text-[#9FB366] bg-green-50"
+                  : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500"
               }`}
               aria-label={bookmarked ? "Remove bookmark" : "Bookmark event"}
             >
-              <Bookmark size={12} />
+              <Bookmark size={16} />
             </button>
           </div>
         </div>
@@ -237,9 +237,11 @@ export default function EventCard({
   onToggleBookmark,
 }) {
   const costClass = COST_BADGE[event.cost] ?? COST_BADGE.paid;
-  const costLabel = event.cost_amount
-    ? `${COST_LABEL[event.cost]} · ${event.cost_amount}`
-    : COST_LABEL[event.cost];
+  const costLabel = event.cost === "suggested_donation"
+    ? "Fundraiser"
+    : event.cost_amount
+      ? `${COST_LABEL[event.cost]} · $${event.cost_amount}`
+      : COST_LABEL[event.cost];
 
   if (variant === "grid") {
     return (

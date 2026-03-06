@@ -149,7 +149,7 @@ export default function BookmarkedEventsSection({
         </div>
         <button
           onClick={() => setShowNewGroupForm(true)}
-          className="flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
+          className="flex items-center gap-2 bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
         >
           <Plus size={14} />
           New Group
@@ -170,7 +170,7 @@ export default function BookmarkedEventsSection({
           />
           <button
             onClick={handleAddGroup}
-            className="px-4 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-semibold transition-colors"
+            className="px-4 py-2 rounded-xl bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm font-semibold transition-colors"
           >
             Create
           </button>

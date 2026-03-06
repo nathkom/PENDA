@@ -1,6 +1,15 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { Bookmark, CalendarPlus, Share2, Calendar, Clock, MapPin, LayoutGrid, Map } from "lucide-react";
+import {
+  Bookmark,
+  CalendarPlus,
+  Share2,
+  Calendar,
+  Clock,
+  MapPin,
+  LayoutGrid,
+  Map,
+} from "lucide-react";
 import { events as staticEvents } from "../data/events";
 import {
   filterEvents,
@@ -14,7 +23,7 @@ import { useUser } from "../context/UserContext";
 
 const COST_LABEL = {
   free: "Free",
-  suggested_donation: "Suggested Donation",
+  suggested_donation: "Fundraiser",
   paid: "Paid",
 };
 
@@ -49,16 +58,26 @@ function formatDate(isoDate) {
 
 // ─── Horizontal event card ────────────────────────────────────────────────────
 
-function EventsListCard({ event, liked, likeCount, onToggleLike, bookmarked, onToggleBookmark }) {
-  const costLabel = event.cost_amount
-    ? `${COST_LABEL[event.cost] || event.cost} · $${event.cost_amount}`
-    : COST_LABEL[event.cost] || event.cost || "";
+function EventsListCard({
+  event,
+  liked,
+  likeCount,
+  onToggleLike,
+  bookmarked,
+  onToggleBookmark,
+}) {
+  const costLabel = event.cost === "suggested_donation"
+    ? "Fundraiser"
+    : event.cost_amount
+      ? `${COST_LABEL[event.cost] || event.cost} · $${event.cost_amount}`
+      : COST_LABEL[event.cost] || event.cost || "";
 
   const tags = [
     costLabel,
     CATEGORY_LABELS[event.category] || event.category,
     ...(event.tags?.slice(0, 2).map((t) => t.replace(/_/g, " ")) || []),
-    ...(event.accessibility?.slice(0, 1).map((a) => a.replace(/_/g, " ")) || []),
+    ...(event.accessibility?.slice(0, 1).map((a) => a.replace(/_/g, " ")) ||
+      []),
   ].filter(Boolean);
 
   return (
@@ -78,7 +97,6 @@ function EventsListCard({ event, liked, likeCount, onToggleLike, bookmarked, onT
 
         {/* Content */}
         <div className="flex-1 p-4 flex flex-col min-w-0 overflow-hidden gap-1.5">
-
           {/* Title + like button */}
           <div className="flex items-start gap-2">
             <h2 className="flex-1 text-lg font-bold text-gray-900 leading-tight line-clamp-1">
@@ -88,7 +106,10 @@ function EventsListCard({ event, liked, likeCount, onToggleLike, bookmarked, onT
               className={`shrink-0 flex items-center gap-1 transition-colors ${
                 liked ? "text-red-500" : "text-gray-300 hover:text-red-400"
               }`}
-              onClick={(e) => { e.preventDefault(); onToggleLike?.(event.id); }}
+              onClick={(e) => {
+                e.preventDefault();
+                onToggleLike?.(event.id);
+              }}
               aria-label={liked ? "Unlike event" : "Like event"}
             >
               ❤️ <span className="text-xs text-gray-500">{likeCount ?? 0}</span>
@@ -99,19 +120,19 @@ function EventsListCard({ event, liked, likeCount, onToggleLike, bookmarked, onT
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
             {event.date && (
               <span className="flex items-center gap-1">
-                <Calendar size={11} className="text-green-600 shrink-0" />
+                <Calendar size={11} className="text-[#97BFFF] shrink-0" />
                 {formatDate(event.date)}
               </span>
             )}
             {event.time && (
               <span className="flex items-center gap-1">
-                <Clock size={11} className="text-green-600 shrink-0" />
+                <Clock size={11} className="text-[#FFA86C] shrink-0" />
                 {event.time}
               </span>
             )}
             {event.space_name && (
               <span className="flex items-center gap-1 truncate">
-                <MapPin size={11} className="text-green-600 shrink-0" />
+                <MapPin size={11} className="text-[#FD858A] shrink-0" />
                 <span className="truncate">{event.space_name}, Seattle</span>
               </span>
             )}
@@ -130,7 +151,7 @@ function EventsListCard({ event, liked, likeCount, onToggleLike, bookmarked, onT
               {tags.slice(0, 3).map((tag) => (
                 <span
                   key={tag}
-                  className="text-xs px-2 py-0.5 rounded-full border border-green-300 text-green-700 capitalize whitespace-nowrap"
+                  className="text-sm px-3 py-1 rounded-full border border-green-300 text-green-700 capitalize whitespace-nowrap"
                 >
                   {tag}
                 </span>
@@ -144,26 +165,26 @@ function EventsListCard({ event, liked, likeCount, onToggleLike, bookmarked, onT
             >
               <button
                 onClick={() => onToggleBookmark?.(event.id)}
-                className={`p-1.5 rounded-lg border transition-colors ${
+                className={`p-2.5 rounded-lg border transition-colors ${
                   bookmarked
-                    ? "border-green-400 text-green-700 bg-green-50"
-                    : "border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-500"
+                    ? "border-[#9FB366] text-[#9FB366] bg-green-50"
+                    : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500"
                 }`}
                 aria-label={bookmarked ? "Remove bookmark" : "Save event"}
               >
-                <Bookmark size={13} />
+                <Bookmark size={16} />
               </button>
               <button
-                className="p-1.5 rounded-lg border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-500 transition-colors"
+                className="p-2.5 rounded-lg border border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500 transition-colors"
                 aria-label="Add to calendar"
               >
-                <CalendarPlus size={13} />
+                <CalendarPlus size={16} />
               </button>
               <button
-                className="p-1.5 rounded-lg border border-gray-200 hover:border-green-400 hover:text-green-700 text-gray-500 transition-colors"
+                className="p-2.5 rounded-lg border border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500 transition-colors"
                 aria-label="Share event"
               >
-                <Share2 size={13} />
+                <Share2 size={16} />
               </button>
             </div>
           </div>
@@ -199,7 +220,10 @@ function FilterSidebar({ filters, onChange }) {
         </legend>
         <div className="flex flex-col gap-2">
           {CATEGORIES.map((cat) => (
-            <label key={cat.id} className="flex items-center gap-2.5 cursor-pointer">
+            <label
+              key={cat.id}
+              className="flex items-center gap-2.5 cursor-pointer"
+            >
               <input
                 type="checkbox"
                 checked={filters.categories.includes(cat.id)}
@@ -278,7 +302,10 @@ function FilterSidebar({ filters, onChange }) {
             ["free", "Free only"],
             ["paid", "Paid only"],
           ].map(([val, label]) => (
-            <label key={val} className="flex items-center gap-2.5 cursor-pointer">
+            <label
+              key={val}
+              className="flex items-center gap-2.5 cursor-pointer"
+            >
               <input
                 type="radio"
                 name="cost-filter"
@@ -302,7 +329,10 @@ function FilterSidebar({ filters, onChange }) {
         </legend>
         <div className="flex flex-col gap-2">
           {ACCESSIBILITY_OPTIONS.map((opt) => (
-            <label key={opt.id} className="flex items-center gap-2.5 cursor-pointer">
+            <label
+              key={opt.id}
+              className="flex items-center gap-2.5 cursor-pointer"
+            >
               <input
                 type="checkbox"
                 checked={filters.accessibility.includes(opt.id)}
@@ -321,7 +351,14 @@ function FilterSidebar({ filters, onChange }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Events() {
-  const { createdEvents, deletedEventIds, editedEvents, bookmarkedEvents, toggleBookmark } = useUser();
+  const {
+    createdEvents,
+    deletedEventIds,
+    editedEvents,
+    bookmarkedEvents,
+    toggleBookmark,
+    attendingEvents,
+  } = useUser();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Keyword comes from NavBar via URL param ?q=
@@ -331,9 +368,13 @@ export default function Events() {
     const merged = [...createdEvents, ...staticEvents];
     const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
     return filtered
-      .map((e) => editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e)
-      .filter((e) => !e.attending_limit || (e.attending_count || 0) < e.attending_limit);
-  }, [createdEvents, deletedEventIds, editedEvents]);
+      .map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e))
+      .filter(
+        (e) =>
+          !e.attending_limit ||
+          (e.attending_count || 0) + (attendingEvents.has(e.id) ? 1 : 0) < e.attending_limit,
+      );
+  }, [createdEvents, deletedEventIds, editedEvents, attendingEvents]);
 
   const [filters, setFilters] = useState(() => {
     const nbParam = searchParams.get("neighborhood");
@@ -373,12 +414,12 @@ export default function Events() {
   // Effective filters merges local state + URL keyword
   const effectiveFilters = useMemo(
     () => ({ ...filters, keyword: urlKeyword }),
-    [filters, urlKeyword]
+    [filters, urlKeyword],
   );
 
   const filteredEvents = useMemo(
     () => filterEvents(events, effectiveFilters),
-    [events, effectiveFilters]
+    [events, effectiveFilters],
   );
 
   const activeCount = [
@@ -400,10 +441,8 @@ export default function Events() {
     <main className="bg-gray-50 min-h-screen pb-16">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex gap-6 items-start">
-
           {/* ── Left sidebar ── */}
           <aside className="w-64 shrink-0 sticky top-20 self-start flex flex-col gap-3">
-
             {/* Card / Map view toggle */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-2 flex gap-1.5">
               <button
@@ -438,9 +477,13 @@ export default function Events() {
           <div className="flex-1 min-w-0">
             {/* Header */}
             <div className="mb-5">
-              <h1 className="text-2xl font-bold text-gray-900">Browse Events</h1>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Browse Events
+              </h1>
               <p className="text-gray-500 text-sm mt-0.5">
-                {filteredEvents.length} event{filteredEvents.length !== 1 ? "s" : ""} in the Greater Seattle Area
+                {filteredEvents.length} event
+                {filteredEvents.length !== 1 ? "s" : ""} in the Greater Seattle
+                Area
                 {activeCount > 0 && (
                   <button
                     onClick={handleClear}

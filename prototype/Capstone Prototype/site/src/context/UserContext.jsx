@@ -7,31 +7,33 @@ export function UserProvider({ children }) {
   const [createdEvents, setCreatedEvents] = useState([]);
   const [deletedEventIds, setDeletedEventIds] = useState(new Set());
   const [editedEvents, setEditedEvents] = useState({});
+  const [createdSpaces, setCreatedSpaces] = useState([]);
 
-  // ── Bookmark state ──────────────────────────────────────────────────────────
+  // ── Bookmark state (bookmarkedEvents persists; groups reset on refresh) ───────
   const [bookmarkedEvents, setBookmarkedEvents] = useState(() => {
     const saved = localStorage.getItem("bookmarkedEvents");
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
 
-  const [bookmarkGroups, setBookmarkGroups] = useState(() => {
-    const saved = localStorage.getItem("bookmarkGroups");
-    return saved ? JSON.parse(saved) : [{ id: "default", name: "Saved Events" }];
-  });
+  // Groups and eventGroupMap are intentionally NOT persisted (demo: per-session only)
+  const [bookmarkGroups, setBookmarkGroups] = useState([{ id: "default", name: "Saved Events" }]);
+  const [eventGroupMap, setEventGroupMap] = useState({});
 
-  // eventGroupMap: { [eventId]: string[] } — events can belong to multiple groups
-  const [eventGroupMap, setEventGroupMap] = useState(() => {
-    const saved = localStorage.getItem("eventGroupMap");
-    if (!saved) return {};
-    const parsed = JSON.parse(saved);
-    // Migrate old format: string → array
-    const migrated = {};
-    Object.keys(parsed).forEach((id) => {
-      const val = parsed[id];
-      migrated[id] = Array.isArray(val) ? val : [val];
-    });
-    return migrated;
-  });
+  // ── Attending state (no persistence — session only) ───────────────────────────
+  const [attendingEvents, setAttendingEvents] = useState(new Set());
+
+  // ── Space CRUD (session-only) ────────────────────────────────────────────────
+  function addCreatedSpace(space) {
+    setCreatedSpaces((prev) => [space, ...prev]);
+  }
+
+  function deleteCreatedSpace(id) {
+    setCreatedSpaces((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  function updateCreatedSpace(id, updated) {
+    setCreatedSpaces((prev) => prev.map((s) => (s.id === id ? updated : s)));
+  }
 
   // ── Event CRUD ──────────────────────────────────────────────────────────────
   function addCreatedEvent(event) {
@@ -63,16 +65,11 @@ export function UserProvider({ children }) {
         setEventGroupMap((g) => {
           const ng = { ...g };
           delete ng[eventId];
-          localStorage.setItem("eventGroupMap", JSON.stringify(ng));
           return ng;
         });
       } else {
         next.add(eventId);
-        setEventGroupMap((g) => {
-          const ng = { ...g, [eventId]: ["default"] };
-          localStorage.setItem("eventGroupMap", JSON.stringify(ng));
-          return ng;
-        });
+        setEventGroupMap((g) => ({ ...g, [eventId]: ["default"] }));
       }
       localStorage.setItem("bookmarkedEvents", JSON.stringify([...next]));
       return next;
@@ -81,29 +78,19 @@ export function UserProvider({ children }) {
 
   function addBookmarkGroup(name) {
     const id = `group-${Date.now()}`;
-    setBookmarkGroups((prev) => {
-      const next = [...prev, { id, name }];
-      localStorage.setItem("bookmarkGroups", JSON.stringify(next));
-      return next;
-    });
+    setBookmarkGroups((prev) => [...prev, { id, name }]);
     return id;
   }
 
   function removeBookmarkGroup(groupId) {
     if (groupId === "default") return;
-    setBookmarkGroups((prev) => {
-      const next = prev.filter((g) => g.id !== groupId);
-      localStorage.setItem("bookmarkGroups", JSON.stringify(next));
-      return next;
-    });
-    // Remove groupId from every event's group array; fall back to ["default"] if empty
+    setBookmarkGroups((prev) => prev.filter((g) => g.id !== groupId));
     setEventGroupMap((prev) => {
       const next = {};
       Object.keys(prev).forEach((id) => {
-        const groups = prev[id].filter((g) => g !== groupId);
+        const groups = (prev[id] || ["default"]).filter((g) => g !== groupId);
         next[id] = groups.length > 0 ? groups : ["default"];
       });
-      localStorage.setItem("eventGroupMap", JSON.stringify(next));
       return next;
     });
   }
@@ -112,9 +99,7 @@ export function UserProvider({ children }) {
     setEventGroupMap((prev) => {
       const current = prev[eventId] || ["default"];
       if (current.includes(groupId)) return prev;
-      const next = { ...prev, [eventId]: [...current, groupId] };
-      localStorage.setItem("eventGroupMap", JSON.stringify(next));
-      return next;
+      return { ...prev, [eventId]: [...current, groupId] };
     });
   }
 
@@ -122,8 +107,19 @@ export function UserProvider({ children }) {
     setEventGroupMap((prev) => {
       const current = prev[eventId] || ["default"];
       const updated = current.filter((g) => g !== groupId);
-      const next = { ...prev, [eventId]: updated.length > 0 ? updated : ["default"] };
-      localStorage.setItem("eventGroupMap", JSON.stringify(next));
+      return { ...prev, [eventId]: updated.length > 0 ? updated : ["default"] };
+    });
+  }
+
+  // ── Attending actions ────────────────────────────────────────────────────────
+  function markAttending(eventId) {
+    setAttendingEvents((prev) => new Set([...prev, eventId]));
+  }
+
+  function unmarkAttending(eventId) {
+    setAttendingEvents((prev) => {
+      const next = new Set(prev);
+      next.delete(eventId);
       return next;
     });
   }
@@ -132,12 +128,14 @@ export function UserProvider({ children }) {
     <UserContext.Provider
       value={{
         user, setUser,
+        createdSpaces, setCreatedSpaces, addCreatedSpace, deleteCreatedSpace, updateCreatedSpace,
         createdEvents, addCreatedEvent,
         deletedEventIds, deleteEvent,
         editedEvents, updateEvent,
         bookmarkedEvents, toggleBookmark,
         bookmarkGroups, addBookmarkGroup, removeBookmarkGroup,
         eventGroupMap, addEventToGroup, removeEventFromGroup,
+        attendingEvents, markAttending, unmarkAttending,
       }}
     >
       {children}
