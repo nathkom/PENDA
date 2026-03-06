@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { neighborhoods } from "../data/neighborhoods";
@@ -6,6 +6,7 @@ import { events as staticEvents } from "../data/events";
 import { useUser } from "../context/UserContext";
 import EventCard from "../components/EventCard";
 import EmptyState from "../components/EmptyState";
+import NeighborhoodsMap from "../components/NeighborhoodsMap";
 
 // ─── Neighborhood grid card ───────────────────────────────────────────────────
 function NeighborhoodTile({ neighborhood, onClick }) {
@@ -150,9 +151,15 @@ export default function Neighborhoods() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  const [mapSelectedNeighborhood, setMapSelectedNeighborhood] = useState("");
+
   function handleBack() {
     setSearchParams({});
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handleMapNeighborhoodClick(name) {
+    setMapSelectedNeighborhood((prev) => (prev === name ? "" : name));
   }
 
   // ── Detail view ──
@@ -174,6 +181,15 @@ export default function Neighborhoods() {
   return (
     <main className="bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 py-10">
+        {/* Interactive map */}
+        <div className="mb-10">
+          <NeighborhoodsMap
+            events={allEvents}
+            selectedNeighborhood={mapSelectedNeighborhood}
+            onNeighborhoodClick={handleMapNeighborhoodClick}
+          />
+        </div>
+
         {/* Page header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">

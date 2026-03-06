@@ -9,6 +9,7 @@ import {
   ACCESSIBILITY_OPTIONS,
 } from "../utils/filters";
 import EmptyState from "../components/EmptyState";
+import NeighborhoodsMap from "../components/NeighborhoodsMap";
 import { useUser } from "../context/UserContext";
 
 const COST_LABEL = {
@@ -343,6 +344,7 @@ export default function Events() {
   });
 
   const [viewMode, setViewMode] = useState("card"); // "card" | "map"
+  const [mapSelectedNeighborhood, setMapSelectedNeighborhood] = useState("");
 
   const [likedEvents, setLikedEvents] = useState(() => {
     const saved = localStorage.getItem("likedEvents");
@@ -451,7 +453,16 @@ export default function Events() {
               </p>
             </div>
 
-            {filteredEvents.length === 0 ? (
+            {viewMode === "map" ? (
+              <NeighborhoodsMap
+                events={filteredEvents}
+                selectedNeighborhood={mapSelectedNeighborhood}
+                onNeighborhoodClick={(name) =>
+                  setMapSelectedNeighborhood((prev) => (prev === name ? "" : name))
+                }
+                height={Math.round(window.innerHeight * 0.7 - 126)}
+              />
+            ) : filteredEvents.length === 0 ? (
               <EmptyState />
             ) : (
               <div className="flex flex-col gap-4">
