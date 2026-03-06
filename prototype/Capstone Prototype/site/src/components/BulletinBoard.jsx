@@ -16,7 +16,7 @@ function pct(x, y, x2, y2) {
 
 const ZONES = [
   // Most liked space → dessert workshop event
-  { coords: pct(83, 687, 685, 1196),   to: "/events/evt-051",                   label: "Most Liked Space: Cafe Matcha Place" },
+  { coords: pct(83, 638, 665, 1136),   to: "/events/evt-051",                   label: "Most Liked Space: Cafe Matcha Place" },
   // Top polaroid → Capitol Hill events
   { coords: pct(1797, 201, 2039, 501),  to: "/events?neighborhood=capitol-hill", label: "Capitol Hill events" },
   // Middle polaroid → free events

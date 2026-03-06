@@ -27,6 +27,7 @@ export const events = [
     accessibility_info: "Welcoming to all, no barriers",
     space_format: "Open seating, drop in anytime",
     crowd_level: 55,
+    attending_count: 18,
   },
   {
     id: "evt-002",
@@ -56,6 +57,7 @@ export const events = [
     accessibility_info: "Welcoming to all, no barriers",
     space_format: "Gallery walk, self-guided",
     crowd_level: 70,
+    attending_count: 42,
   },
   {
     id: "evt-003",
@@ -85,6 +87,7 @@ export const events = [
     accessibility_info: "Welcoming to all, no barriers",
     space_format: "Table games, small groups",
     crowd_level: 60,
+    attending_count: 11,
   },
   {
     id: "evt-004",
@@ -114,6 +117,7 @@ export const events = [
     accessibility_info: "Welcoming to all, no barriers",
     space_format: "Outdoor market, browse freely",
     crowd_level: 75,
+    attending_count: 67,
   },
   {
     id: "evt-005",
@@ -1664,7 +1668,7 @@ export const events = [
     date: "2026-03-14",
     time: "1:00 PM - 3:30 PM",
     cost: "paid",
-    cost_amount: "$42",
+    cost_amount: "$30",
     accessibility: ["wheelchair_accessible", "gender_neutral_restroom"],
     tags: ["food", "workshop", "matcha", "dessert", "beginner_friendly", "indoor"],
     image_url: "/images/matcha-cake.webp",

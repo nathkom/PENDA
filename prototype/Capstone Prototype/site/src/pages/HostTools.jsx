@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   User, FileText, Calendar, Camera, Building2, Mail, Lock,
   Globe, Plus, Edit2, Eye, EyeOff, ChevronRight,
-  Upload, MapPin, X, Check, Trash2, Bookmark, CalendarCheck,
+  Upload, MapPin, X, Check, Trash2, Bookmark, CalendarCheck, Users,
 } from "lucide-react";
 import { useUser } from "../context/UserContext";
 import { events as staticEvents } from "../data/events";
@@ -1096,6 +1096,14 @@ function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent }
                 </div>
                 <p className="text-xs text-gray-500 truncate">{event.space_name} · {event.neighborhood}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{dateStr} · {event.time}</p>
+                {event.attending_count != null && (
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <Users size={11} className="text-[#9FB366] flex-shrink-0" />
+                    <span className="text-xs font-medium text-[#7a9147]">
+                      {event.attending_count} planning to attend
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <button
