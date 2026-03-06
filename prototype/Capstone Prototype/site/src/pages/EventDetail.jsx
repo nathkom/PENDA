@@ -73,11 +73,7 @@ export default function EventDetail() {
 
   const spaceEvents = useMemo(() => {
     if (!event) return [];
-    const matching = allEvents.filter((e) => e.space_name === event.space_name);
-    if (matching.length === 0) return [];
-    // Always show 3 cards; pad by repeating. Exclude current event only if there are other options.
-    const pool = matching.length > 1 ? matching.filter((e) => e.id !== event.id) : matching;
-    return Array.from({ length: 3 }, (_, i) => pool[i % pool.length]);
+    return allEvents.filter((e) => e.space_name === event.space_name && e.id !== event.id).slice(0, 3);
   }, [allEvents, event]);
 
   const [likedEvents, setLikedEvents] = useState(() => {
@@ -118,7 +114,7 @@ export default function EventDetail() {
   const costLabel = event.cost === "suggested_donation"
     ? "Fundraiser"
     : event.cost_amount
-      ? `${COST_LABEL[event.cost]} · $${event.cost_amount}`
+      ? `${COST_LABEL[event.cost]} · $${String(event.cost_amount).replace(/^\$/, "")}`
       : COST_LABEL[event.cost];
 
   const isAttending = attendingEvents.has(event.id);
@@ -201,7 +197,7 @@ export default function EventDetail() {
             />
 
             {/* Date / time / location */}
-            <div className="px-6 pt-5 pb-2 flex flex-col gap-3">
+            <div className="px-6 pt-3 pb-0 flex flex-col gap-1.5">
               <div className="flex items-center gap-3 text-gray-700">
                 <Calendar size={18} className="text-[#97BFFF] shrink-0" aria-hidden="true" />
                 <span className="font-medium">
@@ -224,7 +220,7 @@ export default function EventDetail() {
             </div>
 
             {/* Description */}
-            <div className="px-6 py-5">
+            <div className="px-6 pt-3 pb-5">
               <p className="text-gray-700 leading-relaxed">{event.description}</p>
             </div>
           </div>
@@ -309,6 +305,30 @@ export default function EventDetail() {
                 </button>
               </div>
             </div>
+
+            {/* About the space card */}
+            {linkedSpace && (
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-[#5F77A5] px-6 py-5 border-b border-[#4d6592]">
+                  <h2 className="text-xl font-bold text-white">About the space</h2>
+                </div>
+                <div className="px-6 py-5 flex flex-col gap-3">
+                  <p className="font-semibold text-gray-900">{linkedSpace.name}</p>
+                  {linkedSpace.space_format && (
+                    <p className="text-sm text-gray-600">{linkedSpace.space_format}</p>
+                  )}
+                  {linkedSpace.hours && (
+                    <p className="text-sm text-gray-500">{linkedSpace.hours}</p>
+                  )}
+                  <Link
+                    to={`/spaces/${linkedSpace.id}`}
+                    className="mt-1 w-full flex items-center justify-center bg-[#9FB366] hover:bg-[#8a9c57] text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
+                  >
+                    See the space
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* Attending card */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">

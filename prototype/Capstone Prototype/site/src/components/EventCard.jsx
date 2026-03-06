@@ -161,7 +161,7 @@ function GridCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
       </div>
 
       {/* Content */}
-      <div className="flex flex-col gap-2 p-4 flex-1">
+      <div className="flex flex-col gap-1.5 px-3 pt-2.5 pb-3 flex-1">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-bold text-gray-900 text-base leading-snug group-hover:text-[#9FB366] transition-colors line-clamp-2 flex-1">
             {event.title}
@@ -240,7 +240,7 @@ export default function EventCard({
   const costLabel = event.cost === "suggested_donation"
     ? "Fundraiser"
     : event.cost_amount
-      ? `${COST_LABEL[event.cost]} · $${event.cost_amount}`
+      ? `${COST_LABEL[event.cost]} · $${String(event.cost_amount).replace(/^\$/, "")}`
       : COST_LABEL[event.cost];
 
   if (variant === "grid") {

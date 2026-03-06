@@ -529,12 +529,14 @@ function CreateEventView({ editingEvent, templates, createdSpaces = [], onCancel
                 <div className="flex gap-2">
                   <input
                     type="time"
+                    step="300"
                     value={form.timeStart}
                     onChange={(e) => setForm((f) => ({ ...f, timeStart: e.target.value }))}
                     className={darkSelectCls + " flex-1"}
                   />
                   <input
                     type="time"
+                    step="300"
                     value={form.timeEnd}
                     onChange={(e) => setForm((f) => ({ ...f, timeEnd: e.target.value }))}
                     className={darkSelectCls + " flex-1"}

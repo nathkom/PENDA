@@ -69,7 +69,7 @@ function EventsListCard({
   const costLabel = event.cost === "suggested_donation"
     ? "Fundraiser"
     : event.cost_amount
-      ? `${COST_LABEL[event.cost] || event.cost} · $${event.cost_amount}`
+      ? `${COST_LABEL[event.cost] || event.cost} · $${String(event.cost_amount).replace(/^\$/, "")}`
       : COST_LABEL[event.cost] || event.cost || "";
 
   const tags = [
@@ -378,9 +378,11 @@ export default function Events() {
 
   const [filters, setFilters] = useState(() => {
     const nbParam = searchParams.get("neighborhood");
+    const costParam = searchParams.get("cost");
     return {
       ...DEFAULT_FILTERS,
       neighborhoods: nbParam ? [nbParam] : [],
+      cost: costParam && ["free", "paid"].includes(costParam) ? costParam : "all",
     };
   });
 
@@ -403,11 +405,15 @@ export default function Events() {
     return likedEvents[event.id] ? base + 1 : base;
   }
 
-  // Sync neighborhood from URL on external navigation (e.g. from Neighborhoods page)
+  // Sync neighborhood/cost from URL on external navigation (e.g. from Neighborhoods page or Bulletin Board)
   useEffect(() => {
     const nbParam = searchParams.get("neighborhood");
+    const costParam = searchParams.get("cost");
     if (nbParam) {
       setFilters((f) => ({ ...f, neighborhoods: [nbParam] }));
+    }
+    if (costParam && ["free", "paid"].includes(costParam)) {
+      setFilters((f) => ({ ...f, cost: costParam }));
     }
   }, []);
 

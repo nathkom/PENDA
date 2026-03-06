@@ -48,12 +48,7 @@ export default function SpaceDetail() {
     return allEvents.filter((e) => e.space_name === space.name);
   }, [allEvents, space]);
 
-  const displayEvents = useMemo(() => {
-    if (spaceEvents.length === 0) return [];
-    return Array.from({ length: Math.min(3, Math.max(3, spaceEvents.length)) }, (_, i) =>
-      spaceEvents[i % spaceEvents.length]
-    );
-  }, [spaceEvents]);
+  const displayEvents = useMemo(() => spaceEvents.slice(0, 3), [spaceEvents]);
 
   if (!space) {
     return (
@@ -191,24 +186,6 @@ export default function SpaceDetail() {
               </div>
             </div>
 
-            {/* Upcoming Events card */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="bg-[#5F77A5] px-6 py-5 border-b border-[#4d6592]">
-                <h2 className="text-xl font-bold text-white">Upcoming Events</h2>
-              </div>
-              <div className="px-6 py-5 flex flex-col gap-3">
-                <p className="text-gray-700 text-sm">
-                  <span className="font-bold text-gray-900 text-lg">{spaceEvents.length}</span>{" "}
-                  {spaceEvents.length === 1 ? "event" : "events"} at this space
-                </p>
-                <Link
-                  to={`/events?space=${encodeURIComponent(space.name)}`}
-                  className="text-sm text-[#9FB366] font-semibold hover:underline"
-                >
-                  Browse all events →
-                </Link>
-              </div>
-            </div>
           </div>
         </div>
 
