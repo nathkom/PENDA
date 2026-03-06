@@ -486,7 +486,7 @@ function CreateEventView({ editingEvent, templates, createdSpaces = [], onCancel
                       }}
                       className={darkSelectCls + " w-full"}
                     >
-                      <option value="">Select a space…</option>
+                      <option value="">Select a location…</option>
                       {createdSpaces.map((s) => (
                         <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
