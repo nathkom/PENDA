@@ -437,93 +437,113 @@ export default function Events() {
     setSearchParams({});
   }
 
+  const viewToggle = (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-2 flex gap-1.5">
+      <button
+        onClick={() => setViewMode("card")}
+        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-colors ${
+          viewMode === "card"
+            ? "bg-gray-900 text-white"
+            : "text-gray-500 hover:bg-gray-50"
+        }`}
+      >
+        <LayoutGrid size={14} />
+        Card View
+      </button>
+      <button
+        onClick={() => setViewMode("map")}
+        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-colors ${
+          viewMode === "map"
+            ? "bg-gray-900 text-white"
+            : "text-gray-500 hover:bg-gray-50"
+        }`}
+      >
+        <Map size={14} />
+        Map View
+      </button>
+    </div>
+  );
+
   return (
     <main className="bg-gray-50 min-h-screen pb-16">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex gap-6 items-start">
-          {/* ── Left sidebar ── */}
-          <aside className="w-64 shrink-0 sticky top-20 self-start flex flex-col gap-3">
-            {/* Card / Map view toggle */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-2 flex gap-1.5">
-              <button
-                onClick={() => setViewMode("card")}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                  viewMode === "card"
-                    ? "bg-gray-900 text-white"
-                    : "text-gray-500 hover:bg-gray-50"
-                }`}
-              >
-                <LayoutGrid size={14} />
-                Card View
-              </button>
-              <button
-                onClick={() => setViewMode("map")}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                  viewMode === "map"
-                    ? "bg-gray-900 text-white"
-                    : "text-gray-500 hover:bg-gray-50"
-                }`}
-              >
-                <Map size={14} />
-                Map View
-              </button>
-            </div>
-
-            {/* Filters */}
-            <FilterSidebar filters={filters} onChange={setFilters} />
-          </aside>
-
-          {/* ── Event list ── */}
-          <div className="flex-1 min-w-0">
-            {/* Header */}
-            <div className="mb-5">
-              <h1 className="text-2xl font-bold text-gray-900">
-                Browse Events
-              </h1>
-              <p className="text-gray-500 text-sm mt-0.5">
-                {filteredEvents.length} event
-                {filteredEvents.length !== 1 ? "s" : ""} in the Greater Seattle
-                Area
-                {activeCount > 0 && (
-                  <button
-                    onClick={handleClear}
-                    className="ml-3 inline-flex items-center gap-1 text-sm font-semibold text-red-500 hover:text-red-700 transition-colors"
-                    aria-label="Clear all filters"
-                  >
-                    × Clear {activeCount} filter{activeCount !== 1 ? "s" : ""}
-                  </button>
-                )}
-              </p>
-            </div>
-
-            {viewMode === "map" ? (
-              <NeighborhoodsMap
-                events={filteredEvents}
-                selectedNeighborhood={mapSelectedNeighborhood}
-                onNeighborhoodClick={(name) =>
-                  setMapSelectedNeighborhood((prev) => (prev === name ? "" : name))
-                }
-                height={Math.round(window.innerHeight * 0.7 - 126)}
-              />
-            ) : filteredEvents.length === 0 ? (
-              <EmptyState />
-            ) : (
-              <div className="flex flex-col gap-4">
-                {filteredEvents.map((event) => (
-                  <EventsListCard
-                    key={event.id}
-                    event={event}
-                    liked={likedEvents[event.id]}
-                    likeCount={getLikeCount(event)}
-                    onToggleLike={toggleLike}
-                    bookmarked={bookmarkedEvents.has(event.id)}
-                    onToggleBookmark={toggleBookmark}
-                  />
-                ))}
+        {viewMode === "map" ? (
+          /* ── Map layout: toggle + title row, then full-width map ── */
+          <div className="flex flex-col gap-5">
+            <div className="flex items-start gap-6">
+              <div className="w-64 shrink-0">{viewToggle}</div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Browse Events</h1>
+                <p className="text-gray-500 text-sm mt-0.5">
+                  {filteredEvents.length} event
+                  {filteredEvents.length !== 1 ? "s" : ""} in the Greater Seattle Area
+                  {activeCount > 0 && (
+                    <button
+                      onClick={handleClear}
+                      className="ml-3 inline-flex items-center gap-1 text-sm font-semibold text-red-500 hover:text-red-700 transition-colors"
+                      aria-label="Clear all filters"
+                    >
+                      × Clear {activeCount} filter{activeCount !== 1 ? "s" : ""}
+                    </button>
+                  )}
+                </p>
               </div>
-            )}
+            </div>
+            <NeighborhoodsMap
+              events={filteredEvents}
+              selectedNeighborhood={mapSelectedNeighborhood}
+              onNeighborhoodClick={(name) =>
+                setMapSelectedNeighborhood((prev) => (prev === name ? "" : name))
+              }
+              height={Math.round(window.innerHeight * 0.75 - 80)}
+            />
           </div>
-        </div>
+        ) : (
+          /* ── Card layout: sidebar + event list ── */
+          <div className="flex gap-6 items-start">
+            <aside className="w-64 shrink-0 sticky top-20 self-start flex flex-col gap-3">
+              {viewToggle}
+              <FilterSidebar filters={filters} onChange={setFilters} />
+            </aside>
+
+            <div className="flex-1 min-w-0">
+              <div className="mb-5">
+                <h1 className="text-2xl font-bold text-gray-900">Browse Events</h1>
+                <p className="text-gray-500 text-sm mt-0.5">
+                  {filteredEvents.length} event
+                  {filteredEvents.length !== 1 ? "s" : ""} in the Greater Seattle Area
+                  {activeCount > 0 && (
+                    <button
+                      onClick={handleClear}
+                      className="ml-3 inline-flex items-center gap-1 text-sm font-semibold text-red-500 hover:text-red-700 transition-colors"
+                      aria-label="Clear all filters"
+                    >
+                      × Clear {activeCount} filter{activeCount !== 1 ? "s" : ""}
+                    </button>
+                  )}
+                </p>
+              </div>
+
+              {filteredEvents.length === 0 ? (
+                <EmptyState />
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {filteredEvents.map((event) => (
+                    <EventsListCard
+                      key={event.id}
+                      event={event}
+                      liked={likedEvents[event.id]}
+                      likeCount={getLikeCount(event)}
+                      onToggleLike={toggleLike}
+                      bookmarked={bookmarkedEvents.has(event.id)}
+                      onToggleBookmark={toggleBookmark}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );
