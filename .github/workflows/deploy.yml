@@ -15,10 +15,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: rm -rf node_modules package-lock.json && npm install
         working-directory: "./prototype/Capstone Prototype/site"
 
       - name: Build
