@@ -60,7 +60,7 @@ const TEMPLATE_CATEGORIES = [
     id: "health-wellness",
     name: "Health & Wellness Events",
     description: "ex community garden, farmers market",
-    image: "/images/antenna-ZDN-G1xBWHY-unsplash.jpg",
+    image: `${import.meta.env.BASE_URL}images/antenna-ZDN-G1xBWHY-unsplash.jpg`,
     prefill: {
       category: "outdoors",
       noise_level: "Active and supportive",
@@ -74,7 +74,7 @@ const TEMPLATE_CATEGORIES = [
     id: "social-networking",
     name: "Social & Networking Events",
     description: "Community meetups, mixers, coffee chats",
-    image: "/images/rizky-subagja-1k7TnX5GAww-unsplash.jpg",
+    image: `${import.meta.env.BASE_URL}images/rizky-subagja-1k7TnX5GAww-unsplash.jpg`,
     prefill: {
       category: "social",
       noise_level: "Friendly and open",
@@ -88,7 +88,7 @@ const TEMPLATE_CATEGORIES = [
     id: "cultural-identity",
     name: "Cultural & Identity-Based Events",
     description: "Couple word description",
-    image: "/images/xh_s-_yekOnsm1rE-unsplash.jpg",
+    image: `${import.meta.env.BASE_URL}images/xh_s-_yekOnsm1rE-unsplash.jpg`,
     prefill: {
       category: "arts",
       noise_level: "Lively and celebratory",
@@ -102,7 +102,7 @@ const TEMPLATE_CATEGORIES = [
     id: "markets-popups",
     name: "Markets & Pop-Ups",
     description: "Couple word description",
-    image: "/images/nastuh-abootalebi-eHD8Y1Znfpk-unsplash.jpg",
+    image: `${import.meta.env.BASE_URL}images/nastuh-abootalebi-eHD8Y1Znfpk-unsplash.jpg`,
     prefill: {
       category: "food",
       noise_level: "Casual and browsable",
@@ -124,12 +124,12 @@ const CATEGORY_COLORS = {
 };
 
 const CATEGORY_TO_IMAGE = {
-  social: "/images/rizky-subagja-1k7TnX5GAww-unsplash.jpg",
-  arts: "/images/xh_s-_yekOnsm1rE-unsplash.jpg",
-  outdoors: "/images/antenna-ZDN-G1xBWHY-unsplash.jpg",
-  food: "/images/nastuh-abootalebi-eHD8Y1Znfpk-unsplash.jpg",
-  sports: "/images/headway-F2KRf_QfCqw-unsplash.jpg",
-  educational: "/images/headway-F2KRf_QfCqw-unsplash.jpg",
+  social: `${import.meta.env.BASE_URL}images/rizky-subagja-1k7TnX5GAww-unsplash.jpg`,
+  arts: `${import.meta.env.BASE_URL}images/xh_s-_yekOnsm1rE-unsplash.jpg`,
+  outdoors: `${import.meta.env.BASE_URL}images/antenna-ZDN-G1xBWHY-unsplash.jpg`,
+  food: `${import.meta.env.BASE_URL}images/nastuh-abootalebi-eHD8Y1Znfpk-unsplash.jpg`,
+  sports: `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`,
+  educational: `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`,
 };
 
 const BLANK_FORM = {
@@ -319,7 +319,7 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
       cost_amount: form.cost === "paid" ? form.cost_amount : null,
       accessibility: form.accessibility,
       tags,
-      image_url: imagePreviews[0] || (isEditing ? editingEvent.image_url : "/images/headway-F2KRf_QfCqw-unsplash.jpg"),
+      image_url: imagePreviews[0] || (isEditing ? editingEvent.image_url : `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`),
       gallery_images: imagePreviews.length > 0
         ? imagePreviews.map((url) => ({ url, alt: form.title }))
         : (isEditing ? editingEvent.gallery_images : []),
@@ -394,7 +394,7 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
                     <div key={tpl.id} onClick={() => applyUserTemplate(tpl)} className="cursor-pointer group mb-4">
                       <div className="relative rounded-xl overflow-hidden" style={{ aspectRatio: "4/3" }}>
                         <img
-                          src={tpl.image || CATEGORY_TO_IMAGE[tpl.category] || "/images/headway-F2KRf_QfCqw-unsplash.jpg"}
+                          src={tpl.image || CATEGORY_TO_IMAGE[tpl.category] || `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`}
                           alt={tpl.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
@@ -1267,7 +1267,7 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
       capacity: form.capacity ? parseInt(form.capacity) : null,
       website: form.website,
       amenities: form.amenities,
-      image_url: imagePreview || (isEditing ? editingSpace.image_url : "/images/headway-F2KRf_QfCqw-unsplash.jpg"),
+      image_url: imagePreview || (isEditing ? editingSpace.image_url : `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`),
       gallery_images: imagePreview
         ? [{ url: imagePreview, alt: form.name }]
         : (isEditing ? editingSpace.gallery_images : []),
@@ -1496,7 +1496,7 @@ function SpaceCard({ space, onEdit, onDelete }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex items-center gap-4">
       <img
-        src={space.image_url || "/images/headway-F2KRf_QfCqw-unsplash.jpg"}
+        src={space.image_url || `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`}
         alt={space.name}
         className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
       />

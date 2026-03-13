@@ -35,7 +35,7 @@ export default function BulletinBoard() {
         <div className="flex justify-center">
           <div className="relative w-full">
             <img
-              src="/images/image 27.png"
+              src={`${import.meta.env.BASE_URL}images/image 27.png`}
               alt="Bulletin Board of the Month"
               className="w-full rounded-2xl shadow-lg block"
             />

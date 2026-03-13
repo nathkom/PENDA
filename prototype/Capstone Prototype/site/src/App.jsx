@@ -14,7 +14,7 @@ import UserDashboard from "./pages/UserDashboard";
 export default function App() {
   return (
     <UserProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <div className="min-h-screen bg-gray-50 font-sans flex flex-col">
           <NavBar />
           <div className="flex-1">

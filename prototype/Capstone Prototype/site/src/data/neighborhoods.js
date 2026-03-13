@@ -44,7 +44,7 @@ export const neighborhoods = [
     name: "University District",
     descriptor: "Ideas, energy & exploration",
     description: "Anchored by the University of Washington, the U-District buzzes with intellectual energy, student life, and community programs. Great libraries, lectures, and learning opportunities abound.",
-    image_url: "/images/licensed-image.jpg",
+    image_url: `${import.meta.env.BASE_URL}images/licensed-image.jpg`,
     event_ids: ["evt-014", "evt-015", "evt-040", "evt-041", "evt-042", "evt-043"]
   },
   {
