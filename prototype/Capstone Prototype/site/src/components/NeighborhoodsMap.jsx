@@ -1,6 +1,7 @@
 import "mapbox-gl/dist/mapbox-gl.css"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Map, { Layer, Popup, Source } from "react-map-gl/mapbox"
+import { Link } from "react-router-dom"
 import { SlidersHorizontal, X } from "lucide-react"
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
@@ -298,7 +299,7 @@ export default function NeighborhoodsMap({
   // ── GeoJSON fetch ────────────────────────────────────────────────────────
 
   useEffect(() => {
-    fetch("/seattle-neighborhoods.geojson")
+    fetch(`${import.meta.env.BASE_URL}seattle-neighborhoods.geojson`)
       .then((r) => r.json())
       .then((data) => {
         const geometries = {}
@@ -673,7 +674,7 @@ export default function NeighborhoodsMap({
             <Source
               id="neighborhoods"
               type="geojson"
-              data="/seattle-neighborhoods.geojson"
+              data={`${import.meta.env.BASE_URL}seattle-neighborhoods.geojson`}
               promoteId="cartodb_id"
             >
               <Layer
@@ -835,12 +836,12 @@ export default function NeighborhoodsMap({
                     <p className="text-sm font-semibold text-gray-900">{popupInfo.title}</p>
                     <p className="mt-0.5 text-xs text-gray-500">{popupInfo.spaceName}</p>
                     <p className="mt-0.5 text-xs text-gray-400">{popupInfo.date} · {popupInfo.time}</p>
-                    <a
-                      href={`/events/${popupInfo.id}`}
+                    <Link
+                      to={`/events/${popupInfo.id}`}
                       className="mt-2 inline-block text-xs text-amber-600 hover:underline"
                     >
                       View event →
-                    </a>
+                    </Link>
                   </div>
                 )}
               </Popup>
