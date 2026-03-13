@@ -2,12 +2,9 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useUser } from "../context/UserContext";
-import { spaces as staticSpaces } from "../data/spaces";
-
-const ELM_SPACE = staticSpaces.find((s) => s.id === "elm-coffee-roasters");
 
 export default function SignIn() {
-  const { setUser, setCreatedSpaces } = useUser();
+  const { setUser } = useUser();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -151,11 +148,10 @@ export default function SignIn() {
               type="button"
               onClick={() => {
                 setUser({
-                  name: "Demo Host",
+                  name: "Joshua Acevedo",
                   email: "host@demo.com",
                   role: "host",
                 });
-                if (ELM_SPACE) setCreatedSpaces([ELM_SPACE]);
                 navigate("/host");
               }}
               className="w-full bg-[#5F77A5] hover:bg-[#4d6592] text-white font-semibold py-2.5 rounded-xl transition-colors"

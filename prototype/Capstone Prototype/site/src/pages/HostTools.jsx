@@ -13,7 +13,7 @@ import AttendingEventsSection from "../components/AttendingEventsSection";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const HOST_EVENT_IDS = ["evt-001", "evt-002", "evt-003", "evt-004"];
+const HOST_EVENT_IDS = [];
 
 const INITIAL_TEMPLATES = [
   {
@@ -220,25 +220,31 @@ function eventToForm(event) {
 
 // ─── Create / Edit Event View ─────────────────────────────────────────────────
 
-function CreateEventView({ editingEvent, templates, createdSpaces = [], onCancel, onPublish, onSaveTemplate }) {
+function CreateEventView({ editingEvent, initialTemplate, templates, createdSpaces = [], onCancel, onPublish, onSaveTemplate }) {
   const isEditing = Boolean(editingEvent);
 
-  const [form, setForm] = useState(() =>
-    isEditing ? eventToForm(editingEvent) : { ...BLANK_FORM }
-  );
-  const [imagePreview, setImagePreview] = useState(
-    isEditing ? (editingEvent.image_url || null) : null
-  );
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [form, setForm] = useState(() => {
+    if (isEditing) return eventToForm(editingEvent);
+    if (initialTemplate?.prefill) return { ...BLANK_FORM, ...initialTemplate.prefill };
+    return { ...BLANK_FORM };
+  });
+  const [imagePreviews, setImagePreviews] = useState(() => {
+    if (isEditing) return editingEvent.image_url ? [editingEvent.image_url] : [];
+    if (initialTemplate?.images?.length) return initialTemplate.images;
+    if (initialTemplate?.image) return [initialTemplate.image];
+    return [];
+  });
+  const [selectedTemplate, setSelectedTemplate] = useState(initialTemplate?.id || null);
   const [templatesOpen, setTemplatesOpen] = useState(true);
   const [publishError, setPublishError] = useState("");
   const [templateSaved, setTemplateSaved] = useState(false);
   const imageInputRef = useRef(null);
 
   function handleImageUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImagePreview(URL.createObjectURL(file));
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const urls = files.map((f) => URL.createObjectURL(f));
+    setImagePreviews((prev) => [...prev, ...urls]);
   }
 
   function applyCategory(cat) {
@@ -250,18 +256,34 @@ function CreateEventView({ editingEvent, templates, createdSpaces = [], onCancel
   function applyUserTemplate(tpl) {
     setSelectedTemplate(tpl.id);
     if (tpl.prefill) setForm((f) => ({ ...f, ...tpl.prefill }));
+    if (tpl.images?.length) setImagePreviews(tpl.images);
+    else if (tpl.image) setImagePreviews([tpl.image]);
   }
 
-  function handleSaveTemplate() {
+  async function handleSaveTemplate() {
     const name = form.title.trim() || "Untitled Template";
     const tags = form.tagsInput ? form.tagsInput.split(",").map((t) => t.trim()).filter(Boolean) : [];
+
+    const toBase64 = (url) => {
+      if (!url.startsWith("blob:")) return Promise.resolve(url);
+      return fetch(url)
+        .then((r) => r.blob())
+        .then((blob) => new Promise((res) => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result);
+          reader.readAsDataURL(blob);
+        }));
+    };
+    const images = await Promise.all(imagePreviews.map(toBase64));
+
     onSaveTemplate({
       id: `tpl-${Date.now()}`,
       name,
       category: form.category,
       description: (form.description || "").slice(0, 90) + (form.description.length > 90 ? "…" : ""),
       lastEdited: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      image: imagePreview || null,
+      image: images[0] || null,
+      images,
       prefill: { ...form, tags },
     });
     setTemplateSaved(true);
@@ -297,9 +319,9 @@ function CreateEventView({ editingEvent, templates, createdSpaces = [], onCancel
       cost_amount: form.cost === "paid" ? form.cost_amount : null,
       accessibility: form.accessibility,
       tags,
-      image_url: imagePreview || (isEditing ? editingEvent.image_url : "/images/headway-F2KRf_QfCqw-unsplash.jpg"),
-      gallery_images: imagePreview
-        ? [{ url: imagePreview, alt: form.title }]
+      image_url: imagePreviews[0] || (isEditing ? editingEvent.image_url : "/images/headway-F2KRf_QfCqw-unsplash.jpg"),
+      gallery_images: imagePreviews.length > 0
+        ? imagePreviews.map((url) => ({ url, alt: form.title }))
         : (isEditing ? editingEvent.gallery_images : []),
       contact_email: base.contact_email || "host@demo.com",
       featured: base.featured ?? false,
@@ -422,27 +444,42 @@ function CreateEventView({ editingEvent, templates, createdSpaces = [], onCancel
             )}
 
             {/* 1. Image upload */}
-            <div
-              onClick={() => imageInputRef.current?.click()}
-              className={`${C} rounded-2xl overflow-hidden cursor-pointer hover:opacity-95 transition-opacity flex flex-col items-center justify-center min-h-[170px]`}
-            >
-              {imagePreview ? (
-                <div className="relative w-full">
-                  <img src={imagePreview} alt="Event preview" className="w-full h-52 object-cover" />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity">
-                    <p className="text-white font-semibold text-sm flex items-center gap-2">
-                      <Upload size={16} /> Change Image
-                    </p>
+            <div className={`${C} rounded-2xl overflow-hidden`}>
+              {imagePreviews.length > 0 ? (
+                <div className="flex flex-col">
+                  <div className="grid grid-cols-3 gap-1">
+                    {imagePreviews.map((url, i) => (
+                      <div key={i} className="relative group">
+                        <img src={url} alt={`Event image ${i + 1}`} className="w-full h-28 object-cover" />
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setImagePreviews((prev) => prev.filter((_, idx) => idx !== i)); }}
+                          className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    className="flex items-center justify-center gap-2 py-3 text-white text-sm font-semibold hover:bg-white/10 transition-colors"
+                  >
+                    <Upload size={15} /> Add More Images
+                  </button>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+                <div
+                  onClick={() => imageInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center py-10 px-6 text-center cursor-pointer hover:opacity-95 transition-opacity min-h-[170px]"
+                >
                   <Upload size={36} className="text-white mb-3" />
-                  <h3 className="text-white font-bold text-2xl">Add Event Image</h3>
-                  <p className="text-blue-100 text-sm mt-1">Upload your own or choose from our collection.</p>
+                  <h3 className="text-white font-bold text-2xl">Add Event Images</h3>
+                  <p className="text-blue-100 text-sm mt-1">Select one or more images from your computer.</p>
                 </div>
               )}
-              <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+              <input ref={imageInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
             </div>
 
             {/* 2. Event Title */}
@@ -825,9 +862,9 @@ function ProfileSection({ user, setUser }) {
     email: user?.email || "",
     currentPw: "",
     newPw: "",
-    companyName: "Seattle Community Events Co.",
-    website: "seattleevents.example.com",
-    about: "Connecting Seattle residents through local events and community spaces since 2021.",
+    companyName: "Seattle Ceramic Studio",
+    website: "seattleceramicstudio.example.com",
+    about: "Seattle Ceramic Studio offers hands-on ceramics classes and open studio time for all skill levels in the heart of Seattle.",
   });
   const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
@@ -988,7 +1025,7 @@ function ProfileSection({ user, setUser }) {
 
 // ─── Templates Section ────────────────────────────────────────────────────────
 
-function TemplatesSection({ templates, onCreateTemplate }) {
+function TemplatesSection({ templates, onCreateTemplate, onUseTemplate }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between gap-3">
@@ -1025,7 +1062,7 @@ function TemplatesSection({ templates, onCreateTemplate }) {
               <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors font-medium">
                 <Edit2 size={13} /> Edit
               </button>
-              <button onClick={onCreateTemplate}
+              <button onClick={() => onUseTemplate(tpl)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm transition-colors font-medium">
                 Use
               </button>
@@ -1565,7 +1602,8 @@ const NAV_SECTIONS = [
 ];
 
 export default function HostTools() {
-  const { user, setUser, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, deleteEvent, updateEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, deleteCreatedSpace, updateCreatedSpace } = useUser();
+  const { user, setUser, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, deleteEvent, updateEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, deleteCreatedSpace, updateCreatedSpace, hostTemplates, addHostTemplate } = useUser();
+  const templates = [...INITIAL_TEMPLATES, ...hostTemplates];
   const navigate = useNavigate();
   const location = useLocation();
   const [activeSection, setActiveSection] = useState(() => {
@@ -1576,7 +1614,7 @@ export default function HostTools() {
   const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [editingSpace, setEditingSpace] = useState(null);
-  const [templates, setTemplates] = useState(INITIAL_TEMPLATES);
+  const [initialTemplate, setInitialTemplate] = useState(null);
 
   useEffect(() => {
     if (!user || user.role !== "host") navigate("/signin");
@@ -1592,17 +1630,26 @@ export default function HostTools() {
     }
     setCreateEventOpen(false);
     setEditingEvent(null);
+    setInitialTemplate(null);
     setActiveSection("events");
   }
 
   function handleEditEvent(event) {
+    setInitialTemplate(null);
     setEditingEvent(event);
+    setCreateEventOpen(true);
+  }
+
+  function handleUseTemplate(tpl) {
+    setEditingEvent(null);
+    setInitialTemplate(tpl);
     setCreateEventOpen(true);
   }
 
   function handleCancelCreate() {
     setCreateEventOpen(false);
     setEditingEvent(null);
+    setInitialTemplate(null);
   }
 
   // Host's own events (for the Your Events section)
@@ -1650,11 +1697,12 @@ export default function HostTools() {
     return (
       <CreateEventView
         editingEvent={editingEvent}
+        initialTemplate={initialTemplate}
         templates={templates}
         createdSpaces={createdSpaces}
         onCancel={handleCancelCreate}
         onPublish={handlePublish}
-        onSaveTemplate={(tpl) => setTemplates((prev) => [...prev, tpl])}
+        onSaveTemplate={addHostTemplate}
       />
     );
   }
@@ -1749,7 +1797,8 @@ export default function HostTools() {
             {activeSection === "templates" && (
               <TemplatesSection
                 templates={templates}
-                onCreateTemplate={() => { setEditingEvent(null); setCreateEventOpen(true); }}
+                onCreateTemplate={() => { setEditingEvent(null); setInitialTemplate(null); setCreateEventOpen(true); }}
+                onUseTemplate={handleUseTemplate}
               />
             )}
             {activeSection === "spaces" && (
@@ -1763,7 +1812,7 @@ export default function HostTools() {
             {activeSection === "events" && (
               <EventsSection
                 hostEvents={allHostEvents}
-                onCreateEvent={() => { setEditingEvent(null); setCreateEventOpen(true); }}
+                onCreateEvent={() => { setEditingEvent(null); setInitialTemplate(null); setCreateEventOpen(true); }}
                 onEditEvent={handleEditEvent}
                 onDeleteEvent={deleteEvent}
               />

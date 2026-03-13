@@ -9,6 +9,12 @@ export function UserProvider({ children }) {
   const [editedEvents, setEditedEvents] = useState({});
   const [createdSpaces, setCreatedSpaces] = useState([]);
 
+  // ── Templates (session-only — resets on refresh) ─────────────────────────────
+  const [hostTemplates, setHostTemplates] = useState([]);
+  function addHostTemplate(tpl) {
+    setHostTemplates((prev) => [...prev, tpl]);
+  }
+
   // ── Bookmark state (bookmarkedEvents persists; groups reset on refresh) ───────
   const [bookmarkedEvents, setBookmarkedEvents] = useState(() => {
     const saved = localStorage.getItem("bookmarkedEvents");
@@ -129,6 +135,7 @@ export function UserProvider({ children }) {
       value={{
         user, setUser,
         createdSpaces, setCreatedSpaces, addCreatedSpace, deleteCreatedSpace, updateCreatedSpace,
+        hostTemplates, addHostTemplate,
         createdEvents, addCreatedEvent,
         deletedEventIds, deleteEvent,
         editedEvents, updateEvent,
