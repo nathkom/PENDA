@@ -6,6 +6,10 @@ build/
 .env.local
 .env*.local
 
+# Claude Code
+.claude/
+CLAUDE.md
+
 
 # Dependencies in "prototype-pedro"
 prototype-pedro/node_modules
