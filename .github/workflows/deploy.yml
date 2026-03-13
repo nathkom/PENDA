@@ -23,7 +23,7 @@ jobs:
 
       - name: Build
         run: npm run build
-        working-directory: ./site
+        working-directory: ./prototype/Capstone Prototype/site
         env:
           VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
 
