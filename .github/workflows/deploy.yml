@@ -19,11 +19,11 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-        working-directory: ./site
+        working-directory: "./prototype/Capstone Prototype/site"
 
       - name: Build
         run: npm run build
-        working-directory: ./prototype/Capstone Prototype/site
+        working-directory: "./prototype/Capstone Prototype/site"
         env:
           VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
 
