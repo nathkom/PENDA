@@ -10,7 +10,6 @@ import {
   LayoutGrid,
   Map,
 } from "lucide-react";
-import { events as staticEvents } from "../data/events";
 import {
   filterEvents,
   NEIGHBORHOODS,
@@ -20,6 +19,7 @@ import {
 import EmptyState from "../components/EmptyState";
 import NeighborhoodsMap from "../components/NeighborhoodsMap";
 import { useUser } from "../context/UserContext";
+import { useEvents } from "../hooks/useEvents";
 
 const COST_LABEL = {
   free: "Free",
@@ -351,30 +351,12 @@ function FilterSidebar({ filters, onChange }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Events() {
-  const {
-    createdEvents,
-    deletedEventIds,
-    editedEvents,
-    bookmarkedEvents,
-    toggleBookmark,
-    attendingEvents,
-  } = useUser();
+  const { bookmarkedEvents, toggleBookmark } = useUser();
+  const { events, loading } = useEvents();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Keyword comes from NavBar via URL param ?q=
   const urlKeyword = searchParams.get("q") || "";
-
-  const events = useMemo(() => {
-    const merged = [...createdEvents, ...staticEvents];
-    const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
-    return filtered
-      .map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e))
-      .filter(
-        (e) =>
-          !e.attending_limit ||
-          (e.attending_count || 0) + (attendingEvents.has(e.id) ? 1 : 0) < e.attending_limit,
-      );
-  }, [createdEvents, deletedEventIds, editedEvents, attendingEvents]);
 
   const [filters, setFilters] = useState(() => {
     const nbParam = searchParams.get("neighborhood");
@@ -530,7 +512,13 @@ export default function Events() {
                 </p>
               </div>
 
-              {filteredEvents.length === 0 ? (
+              {loading ? (
+                <div className="flex flex-col gap-4">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="h-[220px] bg-gray-200 animate-pulse rounded-2xl" />
+                  ))}
+                </div>
+              ) : filteredEvents.length === 0 ? (
                 <EmptyState />
               ) : (
                 <div className="flex flex-col gap-4">

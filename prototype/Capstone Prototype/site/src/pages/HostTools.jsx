@@ -8,6 +8,11 @@ import {
 import { useUser } from "../context/UserContext";
 import { events as staticEvents } from "../data/events";
 import { NEIGHBORHOODS } from "../utils/filters";
+import {
+  createEvent as createEventInDB,
+  updateEvent as updateEventInDB,
+  deleteEvent as deleteEventInDB,
+} from "../lib/events";
 import BookmarkedEventsSection from "../components/BookmarkedEventsSection";
 import AttendingEventsSection from "../components/AttendingEventsSection";
 
@@ -1622,11 +1627,21 @@ export default function HostTools() {
 
   if (!user || user.role !== "host") return null;
 
-  function handlePublish(eventData) {
+  async function handlePublish(eventData) {
     if (editingEvent) {
+      // Optimistic local update immediately
       updateEvent(editingEvent.id, eventData);
+      // Persist to Supabase in the background
+      updateEventInDB(editingEvent.id, { ...eventData, host_id: user.id }).catch((err) =>
+        console.warn("Failed to persist event update:", err.message),
+      );
     } else {
+      // Optimistic add immediately
       addCreatedEvent(eventData);
+      // Persist to Supabase in the background
+      createEventInDB({ ...eventData, host_id: user.id }).catch((err) =>
+        console.warn("Failed to persist new event:", err.message),
+      );
     }
     setCreateEventOpen(false);
     setEditingEvent(null);
@@ -1814,7 +1829,12 @@ export default function HostTools() {
                 hostEvents={allHostEvents}
                 onCreateEvent={() => { setEditingEvent(null); setInitialTemplate(null); setCreateEventOpen(true); }}
                 onEditEvent={handleEditEvent}
-                onDeleteEvent={deleteEvent}
+                onDeleteEvent={(id) => {
+                  deleteEvent(id);
+                  deleteEventInDB(id).catch((err) =>
+                    console.warn("Failed to delete event from DB:", err.message),
+                  );
+                }}
               />
             )}
             {activeSection === "bookmarks" && (

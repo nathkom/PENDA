@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -8,12 +8,13 @@ import {
   CalendarPlus,
   Share2,
 } from "lucide-react";
-import { events as staticEvents } from "../data/events";
 import { spaces as staticSpaces } from "../data/spaces";
 import EventCard from "../components/EventCard";
 import EventGallery from "../components/EventGallery";
 import AccessibilityTags from "../components/AccessibilityTags";
 import { useUser } from "../context/UserContext";
+import { useEvents } from "../hooks/useEvents";
+import { trackAnalytic } from "../lib/events";
 
 const CATEGORY_LABELS = {
   social: "Social",
@@ -51,20 +52,17 @@ function formatDate(isoDate) {
 export default function EventDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, createdEvents, deletedEventIds, editedEvents, bookmarkedEvents, toggleBookmark, attendingEvents, markAttending, unmarkAttending, createdSpaces } = useUser();
+  const { user, bookmarkedEvents, toggleBookmark, attendingEvents, markAttending, unmarkAttending, createdSpaces } = useUser();
+  const { events: allEvents, loading } = useEvents();
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [id]);
 
-  // Merged, filtered, and overridden event list
-  const allEvents = useMemo(() => {
-    const merged = [...createdEvents, ...staticEvents];
-    const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
-    return filtered.map((e) =>
-      editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e
-    );
-  }, [createdEvents, deletedEventIds, editedEvents]);
+  // Track page view once the event is resolved
+  useEffect(() => {
+    if (id) trackAnalytic(id, "view", user?.id ?? null);
+  }, [id]);
 
   const event = allEvents.find((e) => e.id === id);
 
@@ -80,6 +78,7 @@ export default function EventDetail() {
     const saved = localStorage.getItem("likedEvents");
     return saved ? JSON.parse(saved) : {};
   });
+  const [attendPop, setAttendPop] = useState(false);
 
   function toggleLike(eventId) {
     const updated = { ...likedEvents, [eventId]: !likedEvents[eventId] };
@@ -90,6 +89,18 @@ export default function EventDetail() {
   function getLikeCount(e) {
     const base = e.likes || 0;
     return likedEvents[e.id] ? base + 1 : base;
+  }
+
+  if (loading) {
+    return (
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <div className="h-8 w-24 bg-gray-200 animate-pulse rounded mb-6" />
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex-1 h-[500px] bg-gray-200 animate-pulse rounded-2xl" />
+          <div className="w-full lg:w-80 h-64 bg-gray-200 animate-pulse rounded-2xl" />
+        </div>
+      </main>
+    );
   }
 
   if (!event) {
@@ -118,7 +129,6 @@ export default function EventDetail() {
       : COST_LABEL[event.cost];
 
   const isAttending = attendingEvents.has(event.id);
-  const [attendPop, setAttendPop] = useState(false);
 
   function handleMarkAttending() {
     if (!isAttending) {

@@ -8,6 +8,7 @@ import Events from "./pages/Events";
 import EventDetail from "./pages/EventDetail";
 import SpaceDetail from "./pages/SpaceDetail";
 import SignIn from "./pages/SignIn";
+import SignUp from "./pages/SignUp";
 import HostTools from "./pages/HostTools";
 import UserDashboard from "./pages/UserDashboard";
 
@@ -25,6 +26,7 @@ export default function App() {
               <Route path="/events/:id" element={<EventDetail />} />
               <Route path="/spaces/:id" element={<SpaceDetail />} />
               <Route path="/signin" element={<SignIn />} />
+              <Route path="/signup" element={<SignUp />} />
               <Route path="/host" element={<HostTools />} />
               <Route path="/dashboard" element={<UserDashboard />} />
             </Routes>

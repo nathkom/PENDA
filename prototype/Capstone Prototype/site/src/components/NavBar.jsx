@@ -24,7 +24,7 @@ const NAV_LINKS = [
 ];
 
 export default function NavBar() {
-  const { user, setUser } = useUser();
+  const { user, signOut } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -81,7 +81,7 @@ export default function NavBar() {
   }, [profileOpen]);
 
   function handleLogout() {
-    setUser(null);
+    signOut();
     setProfileOpen(false);
     setMenuOpen(false);
     navigate("/");

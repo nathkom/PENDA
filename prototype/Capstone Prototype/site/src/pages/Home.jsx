@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
-import { events as staticEvents } from "../data/events";
 import { useUser } from "../context/UserContext";
+import { useEvents } from "../hooks/useEvents";
 import { filterEvents } from "../utils/filters";
 import BulletinBoard from "../components/BulletinBoard";
 import FilterCard from "../components/FilterCard";
@@ -41,17 +41,10 @@ const getLikeCount = (event) => {
   const base = event.likes || 0;
   return likedEvents[event.id] ? base + 1 : base;
 };
-  const { user, createdEvents, deletedEventIds, editedEvents, bookmarkedEvents, toggleBookmark, attendingEvents } = useUser();
+  const { user, bookmarkedEvents, toggleBookmark } = useUser();
+  const { events: allEvents, loading } = useEvents();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
-
-  const allEvents = useMemo(() => {
-    const merged = [...createdEvents, ...staticEvents];
-    const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
-    return filtered
-      .map((e) => editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e)
-      .filter((e) => !e.attending_limit || (e.attending_count || 0) + (attendingEvents.has(e.id) ? 1 : 0) < e.attending_limit);
-  }, [createdEvents, deletedEventIds, editedEvents]);
 
   const filteredEvents = useMemo(
     () => filterEvents(allEvents, filters),
@@ -122,7 +115,13 @@ if (sortType === "mostLiked") {
 
           {/* Event list */}
           <section className="flex-1 min-w-0" aria-label="Event feed">
-            {filteredEvents.length === 0 ? (
+            {loading ? (
+              <div className="flex flex-col gap-4">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-36 bg-gray-200 animate-pulse rounded-2xl" />
+                ))}
+              </div>
+            ) : filteredEvents.length === 0 ? (
               <EmptyState />
             ) : (
               <div className="flex flex-col gap-4">

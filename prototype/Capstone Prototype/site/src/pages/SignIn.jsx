@@ -4,22 +4,30 @@ import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useUser } from "../context/UserContext";
 
 export default function SignIn() {
-  const { setUser } = useUser();
+  const { signIn, setUser } = useUser();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
+    setError("");
     if (!email || !password) {
       setError("Please enter your email and password.");
       return;
     }
-    // Mock sign-in — set a demo user and redirect home
-    setUser({ name: email.split("@")[0], email });
-    navigate("/");
+    setLoading(true);
+    try {
+      await signIn(email, password);
+      navigate("/");
+    } catch (err) {
+      setError(err.message ?? "Invalid email or password.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -129,9 +137,10 @@ export default function SignIn() {
             {/* Submit */}
             <button
               type="submit"
-              className="w-full bg-[#5F77A5] hover:bg-[#4d6592] text-white font-semibold py-2.5 rounded-xl transition-colors mt-1"
+              disabled={loading}
+              className="w-full bg-[#5F77A5] hover:bg-[#4d6592] disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors mt-1"
             >
-              Sign In
+              {loading ? "Signing in…" : "Sign In"}
             </button>
           </form>
 
@@ -178,9 +187,9 @@ export default function SignIn() {
         {/* Sign up prompt */}
         <p className="text-center text-sm text-gray-500 mt-6">
           Don't have an account?{" "}
-          <button className="text-[#5F77A5] font-semibold hover:underline">
+          <Link to="/signup" className="text-[#5F77A5] font-semibold hover:underline">
             Sign up
-          </button>
+          </Link>
         </p>
       </div>
     </main>
