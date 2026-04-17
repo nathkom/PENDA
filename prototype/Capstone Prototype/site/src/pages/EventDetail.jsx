@@ -230,8 +230,14 @@ export default function EventDetail() {
             </div>
 
             {/* Description */}
-            <div className="px-6 pt-3 pb-5">
-              <p className="text-gray-700 leading-relaxed">{event.description}</p>
+            <div className="px-6 pt-3 pb-5 flex flex-col gap-1">
+              {(event.description || "").split("\n").map((line, i) =>
+                line.trim() ? (
+                  <p key={i} className="text-gray-700 leading-relaxed">{line}</p>
+                ) : (
+                  <div key={i} className="h-2" />
+                )
+              )}
             </div>
           </div>
 

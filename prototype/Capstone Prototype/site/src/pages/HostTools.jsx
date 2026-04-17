@@ -244,12 +244,44 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
   const [publishError, setPublishError] = useState("");
   const [templateSaved, setTemplateSaved] = useState(false);
   const imageInputRef = useRef(null);
+  const dragIndex = useRef(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
+
+  const C = "bg-white border border-gray-200 shadow-sm";
+  const inputCls =
+    "w-full bg-transparent text-gray-900 placeholder:text-gray-400 border-b border-gray-200 pb-1.5 outline-none focus:border-gray-500 transition-colors text-sm";
+  const darkSelectCls =
+    "bg-white text-gray-900 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-gray-400";
 
   function handleImageUpload(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     const urls = files.map((f) => URL.createObjectURL(f));
     setImagePreviews((prev) => [...prev, ...urls]);
+  }
+
+  function handleImgDragStart(i) {
+    dragIndex.current = i;
+  }
+  function handleImgDragOver(e, i) {
+    e.preventDefault();
+    setDragOverIdx(i);
+  }
+  function handleImgDrop(i) {
+    const from = dragIndex.current;
+    if (from === null || from === i) { setDragOverIdx(null); return; }
+    setImagePreviews((prev) => {
+      const arr = [...prev];
+      const [moved] = arr.splice(from, 1);
+      arr.splice(i, 0, moved);
+      return arr;
+    });
+    dragIndex.current = null;
+    setDragOverIdx(null);
+  }
+  function handleImgDragEnd() {
+    dragIndex.current = null;
+    setDragOverIdx(null);
   }
 
   function applyCategory(cat) {
@@ -339,12 +371,6 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
       attending_count: isEditing ? (editingEvent.attending_count || 0) : 0,
     });
   }
-
-  const C = "bg-[#6c7fc4]";
-  const inputCls =
-    "w-full bg-transparent text-white placeholder:text-blue-200/60 border-b border-white/25 pb-1.5 outline-none focus:border-white/70 transition-colors text-sm";
-  const darkSelectCls =
-    "bg-[#5a6daa] text-white text-sm border border-white/25 rounded-lg px-2.5 py-1.5 outline-none focus:border-white/60";
 
   return (
     <div className="flex flex-col bg-stone-100" style={{ height: "calc(100vh - 64px)" }}>
@@ -452,10 +478,32 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
             <div className={`${C} rounded-2xl overflow-hidden`}>
               {imagePreviews.length > 0 ? (
                 <div className="flex flex-col">
-                  <div className="grid grid-cols-3 gap-1">
+                  {imagePreviews.length > 1 && (
+                    <p className="text-xs text-gray-400 text-center py-2 border-b border-gray-100">
+                      Drag images to reorder · First image is the cover
+                    </p>
+                  )}
+                  <div className="grid grid-cols-3 gap-1 p-1">
                     {imagePreviews.map((url, i) => (
-                      <div key={i} className="relative group">
-                        <img src={url} alt={`Event image ${i + 1}`} className="w-full h-28 object-cover" />
+                      <div
+                        key={url + i}
+                        draggable
+                        onDragStart={() => handleImgDragStart(i)}
+                        onDragOver={(e) => handleImgDragOver(e, i)}
+                        onDrop={() => handleImgDrop(i)}
+                        onDragEnd={handleImgDragEnd}
+                        className={`relative group cursor-grab active:cursor-grabbing rounded overflow-hidden transition-all ${
+                          dragOverIdx === i && dragIndex.current !== i
+                            ? "ring-2 ring-[#9FB366] opacity-60"
+                            : ""
+                        }`}
+                      >
+                        <img src={url} alt={`Event image ${i + 1}`} className="w-full h-28 object-cover pointer-events-none" />
+                        {i === 0 && (
+                          <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/50 rounded text-white text-[10px] font-semibold leading-none">
+                            Cover
+                          </span>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setImagePreviews((prev) => prev.filter((_, idx) => idx !== i)); }}
@@ -469,7 +517,7 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
                   <button
                     type="button"
                     onClick={() => imageInputRef.current?.click()}
-                    className="flex items-center justify-center gap-2 py-3 text-white text-sm font-semibold hover:bg-white/10 transition-colors"
+                    className="flex items-center justify-center gap-2 py-3 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors border-t border-gray-100"
                   >
                     <Upload size={15} /> Add More Images
                   </button>
@@ -477,11 +525,11 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
               ) : (
                 <div
                   onClick={() => imageInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center py-10 px-6 text-center cursor-pointer hover:opacity-95 transition-opacity min-h-[170px]"
+                  className="flex flex-col items-center justify-center py-10 px-6 text-center cursor-pointer hover:bg-gray-50 transition-colors min-h-[170px]"
                 >
-                  <Upload size={36} className="text-white mb-3" />
-                  <h3 className="text-white font-bold text-2xl">Add Event Images</h3>
-                  <p className="text-blue-100 text-sm mt-1">Select one or more images from your computer.</p>
+                  <Upload size={36} className="text-gray-400 mb-3" />
+                  <h3 className="text-gray-900 font-semibold text-lg">Add Event Images</h3>
+                  <p className="text-gray-500 text-sm mt-1">Select one or more images from your computer.</p>
                 </div>
               )}
               <input ref={imageInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
@@ -489,7 +537,7 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
 
             {/* 2. Event Title */}
             <div className={`${C} rounded-2xl p-6`}>
-              <h3 className="text-white font-bold text-2xl mb-3">Event Title</h3>
+              <h3 className="text-gray-900 font-semibold text-lg mb-3">Event Title</h3>
               <input
                 type="text"
                 value={form.title}
@@ -502,12 +550,12 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
             {/* 3. Location + Date & Time */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className={`${C} rounded-2xl p-6`}>
-                <h3 className="text-white font-bold text-xl mb-3 flex items-center gap-2">
+                <h3 className="text-gray-900 font-semibold text-lg mb-3 flex items-center gap-2">
                   <MapPin size={18} /> Location
                 </h3>
                 {createdSpaces.length > 0 && (
                   <div className="mb-3">
-                    <p className="text-blue-100 text-xs mb-1.5">Select a space you manage</p>
+                    <p className="text-gray-500 text-xs mb-1.5">Select a space you manage</p>
                     <select
                       value={form.selectedSpaceId}
                       onChange={(e) => {
@@ -558,10 +606,10 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
               </div>
 
               <div className={`${C} rounded-2xl p-6`}>
-                <h3 className="text-white font-bold text-xl mb-2 flex items-center gap-2">
+                <h3 className="text-gray-900 font-semibold text-lg mb-2 flex items-center gap-2">
                   📅 Date &amp; Time
                 </h3>
-                <p className="text-blue-100 text-xs mb-2">Select the date and time of your event.</p>
+                <p className="text-gray-500 text-xs mb-2">Select the date and time of your event.</p>
                 <input
                   type="date"
                   value={form.date}
@@ -584,147 +632,151 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
                     className={darkSelectCls + " flex-1"}
                   />
                 </div>
-                <p className="text-blue-200/70 text-xs mt-2">Example: Friday, April 3 · 10:00 AM – 12:00 PM</p>
+                <p className="text-gray-400 text-xs mt-2">Example: Friday, April 3 · 10:00 AM – 12:00 PM</p>
               </div>
             </div>
 
-            {/* 4. Map preview placeholder */}
-            <div className="bg-stone-200 rounded-2xl p-6 min-h-[90px] flex items-center justify-center">
-              <p className="text-stone-400 text-sm italic">Optional: Show map preview</p>
-            </div>
+            {/* 4. Event Overview + What to Expect + Event Details (combined) */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col gap-5">
 
-            {/* 5. Event Overview */}
-            <div className={`${C} rounded-2xl p-6`}>
-              <h3 className="text-white font-bold text-xl mb-1">✏️ Event Overview</h3>
-              <p className="text-blue-100 text-sm mb-3">
-                Briefly describe your event. What is it? Who is it for? Why should someone come?
-              </p>
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Write your event description here…"
-                rows={4}
-                className="w-full bg-transparent text-white placeholder:text-blue-200/55 resize-none outline-none text-sm leading-relaxed"
-              />
-              <p className="text-blue-200/60 text-xs mt-2">(Recommended: 2–4 short sentences)</p>
-            </div>
-
-            {/* 6. What to Expect */}
-            <div className={`${C} rounded-2xl p-6`}>
-              <h3 className="text-white font-bold text-xl mb-1">What to Expect</h3>
-              <p className="text-blue-100 text-sm mb-4">Help attendees understand the vibe and format.</p>
-              <div className="flex flex-col gap-4">
-                <div>
-                  <p className="text-blue-100 text-xs font-medium mb-1.5">• Noise Level</p>
-                  <input
-                    type="text"
-                    value={form.noise_level}
-                    onChange={(e) => setForm((f) => ({ ...f, noise_level: e.target.value }))}
-                    placeholder="Quiet, moderate, lively, loud, etc."
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <p className="text-blue-100 text-xs font-medium mb-1.5">• Accessibility Information</p>
-                  <input
-                    type="text"
-                    value={form.accessibility_info}
-                    onChange={(e) => setForm((f) => ({ ...f, accessibility_info: e.target.value }))}
-                    placeholder="e.g. Fully accessible, outdoor terrain, etc."
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <p className="text-blue-100 text-xs font-medium mb-1.5">• Space Format</p>
-                  <input
-                    type="text"
-                    value={form.space_format}
-                    onChange={(e) => setForm((f) => ({ ...f, space_format: e.target.value }))}
-                    placeholder="Workshop, dinner & show, open mingling, panel, etc."
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <p className="text-blue-100 text-xs font-medium mb-1.5">• (Optional) Attendance Level</p>
-                  <select
-                    value={form.crowd_level_label}
-                    onChange={(e) => {
-                      const label = e.target.value;
-                      const level = label === "Small group" ? 25 : label === "Large crowd" ? 80 : 55;
-                      setForm((f) => ({ ...f, crowd_level_label: label, crowd_level: level }));
-                    }}
-                    className={darkSelectCls}
-                  >
-                    <option value="">Select…</option>
-                    <option value="Small group">Small group</option>
-                    <option value="Moderately busy">Moderately busy</option>
-                    <option value="Large crowd">Large crowd</option>
-                  </select>
-                </div>
+              {/* Overview */}
+              <div>
+                <h3 className="text-gray-900 font-semibold text-lg mb-1">Event Overview</h3>
+                <p className="text-gray-500 text-sm mb-3">
+                  Briefly describe your event. What is it? Who is it for? Why should someone come?
+                </p>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="Write your event description here…"
+                  rows={4}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 resize-none outline-none focus:ring-2 focus:ring-green-500 leading-relaxed"
+                />
+                <p className="text-gray-400 text-xs mt-1.5">Recommended: 2–4 short sentences</p>
               </div>
-            </div>
 
-            {/* 7. Event Details */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-              <h3 className="font-bold text-gray-900 text-lg mb-4">Event Details</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-semibold text-gray-700">Category</label>
-                  <select
-                    value={form.category}
-                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="social">Social</option>
-                    <option value="arts">Arts</option>
-                    <option value="outdoors">Outdoors</option>
-                    <option value="food">Food</option>
-                    <option value="sports">Sports</option>
-                    <option value="educational">Educational</option>
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-semibold text-gray-700">Cost</label>
-                  <select
-                    value={form.cost}
-                    onChange={(e) => setForm((f) => ({ ...f, cost: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="free">Free</option>
-                    <option value="paid">Paid</option>
-                  </select>
-                </div>
-                {form.cost === "paid" && (
+              <div className="border-t border-gray-100" />
+
+              {/* What to Expect */}
+              <div>
+                <h3 className="text-gray-900 font-semibold text-lg mb-1">What to Expect</h3>
+                <p className="text-gray-500 text-sm mb-4">Help attendees understand the vibe and format.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-semibold text-gray-700">Price ($)</label>
+                    <label className="text-sm font-semibold text-gray-700">Noise Level</label>
                     <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form.cost_amount ?? ""}
-                      onChange={(e) => setForm((f) => ({ ...f, cost_amount: parseFloat(e.target.value) || null }))}
-                      placeholder="0.00"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      type="text"
+                      value={form.noise_level}
+                      onChange={(e) => setForm((f) => ({ ...f, noise_level: e.target.value }))}
+                      placeholder="Quiet, moderate, lively, loud…"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
-                )}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-semibold text-gray-700">Tags</label>
-                  <input
-                    type="text"
-                    value={form.tagsInput}
-                    onChange={(e) => setForm((f) => ({ ...f, tagsInput: e.target.value }))}
-                    placeholder="drop_in, outdoor, community"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                  <p className="text-xs text-gray-400">Comma-separated</p>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold text-gray-700">Space Format</label>
+                    <input
+                      type="text"
+                      value={form.space_format}
+                      onChange={(e) => setForm((f) => ({ ...f, space_format: e.target.value }))}
+                      placeholder="Workshop, open mingling, panel…"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold text-gray-700">Accessibility Info</label>
+                    <input
+                      type="text"
+                      value={form.accessibility_info}
+                      onChange={(e) => setForm((f) => ({ ...f, accessibility_info: e.target.value }))}
+                      placeholder="e.g. Fully accessible, outdoor terrain…"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold text-gray-700">Attendance Level <span className="font-normal text-gray-400">(optional)</span></label>
+                    <select
+                      value={form.crowd_level_label}
+                      onChange={(e) => {
+                        const label = e.target.value;
+                        const level = label === "Small group" ? 25 : label === "Large crowd" ? 80 : 55;
+                        setForm((f) => ({ ...f, crowd_level_label: label, crowd_level: level }));
+                      }}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="">Select…</option>
+                      <option value="Small group">Small group</option>
+                      <option value="Moderately busy">Moderately busy</option>
+                      <option value="Large crowd">Large crowd</option>
+                    </select>
+                  </div>
                 </div>
               </div>
+
+              <div className="border-t border-gray-100" />
+
+              {/* Event Details */}
+              <div>
+                <h3 className="text-gray-900 font-semibold text-lg mb-4">Event Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold text-gray-700">Category</label>
+                    <select
+                      value={form.category}
+                      onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="social">Social</option>
+                      <option value="arts">Arts</option>
+                      <option value="outdoors">Outdoors</option>
+                      <option value="food">Food</option>
+                      <option value="sports">Sports</option>
+                      <option value="educational">Educational</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold text-gray-700">Cost</label>
+                    <select
+                      value={form.cost}
+                      onChange={(e) => setForm((f) => ({ ...f, cost: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="free">Free</option>
+                      <option value="paid">Paid</option>
+                    </select>
+                  </div>
+                  {form.cost === "paid" && (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-semibold text-gray-700">Price ($)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.cost_amount ?? ""}
+                        onChange={(e) => setForm((f) => ({ ...f, cost_amount: parseFloat(e.target.value) || null }))}
+                        placeholder="0.00"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold text-gray-700">Tags</label>
+                    <input
+                      type="text"
+                      value={form.tagsInput}
+                      onChange={(e) => setForm((f) => ({ ...f, tagsInput: e.target.value }))}
+                      placeholder="drop_in, outdoor, community"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <p className="text-xs text-gray-400">Comma-separated</p>
+                  </div>
+                </div>
+              </div>
+
             </div>
 
             {/* 8. Accessibility */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-              <h3 className="font-bold text-gray-900 text-lg mb-4">Accessibility</h3>
+              <h3 className="font-semibold text-gray-900 text-lg mb-4">Accessibility</h3>
               <div className="flex flex-wrap gap-2">
                 {[
                   { id: "wheelchair_accessible", label: "♿ Wheelchair Accessible" },
@@ -760,7 +812,7 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
 
             {/* 9. Attending Limit */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-              <h3 className="font-bold text-gray-900 text-lg mb-1">Attendance Settings</h3>
+              <h3 className="font-semibold text-gray-900 text-lg mb-1">Attendance Settings</h3>
               <p className="text-sm text-gray-500 mb-4">
                 Set a maximum number of attendees and control what attendees see.
               </p>
@@ -1244,16 +1296,47 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
         }
       : { ...BLANK_SPACE_FORM }
   );
-  const [imagePreview, setImagePreview] = useState(
-    isEditing ? (editingSpace.image_url || null) : null
-  );
+  const [imagePreviews, setImagePreviews] = useState(() => {
+    if (isEditing) {
+      if (editingSpace.gallery_images?.length) return editingSpace.gallery_images.map((g) => g.url);
+      if (editingSpace.image_url) return [editingSpace.image_url];
+    }
+    return [];
+  });
   const [publishError, setPublishError] = useState("");
   const imageInputRef = useRef(null);
+  const dragIndex = useRef(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
 
   function handleImageUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImagePreview(URL.createObjectURL(file));
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const urls = files.map((f) => URL.createObjectURL(f));
+    setImagePreviews((prev) => [...prev, ...urls]);
+  }
+
+  function handleImgDragStart(i) {
+    dragIndex.current = i;
+  }
+  function handleImgDragOver(e, i) {
+    e.preventDefault();
+    setDragOverIdx(i);
+  }
+  function handleImgDrop(i) {
+    const from = dragIndex.current;
+    if (from === null || from === i) { setDragOverIdx(null); return; }
+    setImagePreviews((prev) => {
+      const arr = [...prev];
+      const [moved] = arr.splice(from, 1);
+      arr.splice(i, 0, moved);
+      return arr;
+    });
+    dragIndex.current = null;
+    setDragOverIdx(null);
+  }
+  function handleImgDragEnd() {
+    dragIndex.current = null;
+    setDragOverIdx(null);
   }
 
   function handlePublish() {
@@ -1272,20 +1355,20 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
       capacity: form.capacity ? parseInt(form.capacity) : null,
       website: form.website,
       amenities: form.amenities,
-      image_url: imagePreview || (isEditing ? editingSpace.image_url : `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`),
-      gallery_images: imagePreview
-        ? [{ url: imagePreview, alt: form.name }]
+      image_url: imagePreviews[0] || (isEditing ? editingSpace.image_url : `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`),
+      gallery_images: imagePreviews.length > 0
+        ? imagePreviews.map((url) => ({ url, alt: form.name }))
         : (isEditing ? editingSpace.gallery_images : []),
       noise_level: base.noise_level || "",
       space_format: base.space_format || "",
     });
   }
 
-  const C = "bg-[#6c7fc4]";
+  const C = "bg-white border border-gray-200 shadow-sm";
   const inputCls =
-    "w-full bg-transparent text-white placeholder:text-blue-200/60 border-b border-white/25 pb-1.5 outline-none focus:border-white/70 transition-colors text-sm";
+    "w-full bg-transparent text-gray-900 placeholder:text-gray-400 border-b border-gray-200 pb-1.5 outline-none focus:border-gray-500 transition-colors text-sm";
   const darkSelectCls =
-    "bg-[#5a6daa] text-white text-sm border border-white/25 rounded-lg px-2.5 py-1.5 outline-none focus:border-white/60";
+    "bg-white text-gray-900 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-gray-400";
 
   return (
     <div className="flex flex-col bg-stone-100" style={{ height: "calc(100vh - 64px)" }}>
@@ -1303,32 +1386,69 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
           )}
 
           {/* Image upload */}
-          <div
-            onClick={() => imageInputRef.current?.click()}
-            className={`${C} rounded-2xl overflow-hidden cursor-pointer hover:opacity-95 transition-opacity flex flex-col items-center justify-center min-h-[170px]`}
-          >
-            {imagePreview ? (
-              <div className="relative w-full">
-                <img src={imagePreview} alt="Space preview" className="w-full h-52 object-cover" />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity">
-                  <p className="text-white font-semibold text-sm flex items-center gap-2">
-                    <Upload size={16} /> Change Image
+          <div className={`${C} rounded-2xl overflow-hidden`}>
+            {imagePreviews.length > 0 ? (
+              <div className="flex flex-col">
+                {imagePreviews.length > 1 && (
+                  <p className="text-xs text-gray-400 text-center py-2 border-b border-gray-100">
+                    Drag images to reorder · First image is the cover
                   </p>
+                )}
+                <div className="grid grid-cols-3 gap-1 p-1">
+                  {imagePreviews.map((url, i) => (
+                    <div
+                      key={url + i}
+                      draggable
+                      onDragStart={() => handleImgDragStart(i)}
+                      onDragOver={(e) => handleImgDragOver(e, i)}
+                      onDrop={() => handleImgDrop(i)}
+                      onDragEnd={handleImgDragEnd}
+                      className={`relative group cursor-grab active:cursor-grabbing rounded overflow-hidden transition-all ${
+                        dragOverIdx === i && dragIndex.current !== i
+                          ? "ring-2 ring-[#9FB366] opacity-60"
+                          : ""
+                      }`}
+                    >
+                      <img src={url} alt={`Space image ${i + 1}`} className="w-full h-28 object-cover pointer-events-none" />
+                      {i === 0 && (
+                        <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/50 rounded text-white text-[10px] font-semibold leading-none">
+                          Cover
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setImagePreviews((prev) => prev.filter((_, idx) => idx !== i)); }}
+                        className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  className="flex items-center justify-center gap-2 py-3 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors border-t border-gray-100"
+                >
+                  <Upload size={15} /> Add More Images
+                </button>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-                <Upload size={36} className="text-white mb-3" />
-                <h3 className="text-white font-bold text-2xl">Add Space Image</h3>
-                <p className="text-blue-100 text-sm mt-1">Upload a photo of your venue.</p>
+              <div
+                onClick={() => imageInputRef.current?.click()}
+                className="flex flex-col items-center justify-center py-10 px-6 text-center cursor-pointer hover:bg-gray-50 transition-colors min-h-[170px]"
+              >
+                <Upload size={36} className="text-gray-400 mb-3" />
+                <h3 className="text-gray-900 font-semibold text-lg">Add Space Images</h3>
+                <p className="text-gray-500 text-sm mt-1">Upload photos of your venue.</p>
               </div>
             )}
-            <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+            <input ref={imageInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
           </div>
 
           {/* Space Name */}
           <div className={`${C} rounded-2xl p-6`}>
-            <h3 className="text-white font-bold text-2xl mb-3">Space Name</h3>
+            <h3 className="text-gray-900 font-bold text-2xl mb-3">Space Name</h3>
             <input
               type="text"
               value={form.name}
@@ -1341,7 +1461,7 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
           {/* Address + Neighborhood */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className={`${C} rounded-2xl p-6`}>
-              <h3 className="text-white font-bold text-xl mb-3 flex items-center gap-2">
+              <h3 className="text-gray-900 font-bold text-xl mb-3 flex items-center gap-2">
                 <MapPin size={18} /> Address
               </h3>
               <input
@@ -1364,8 +1484,8 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
             </div>
 
             <div className={`${C} rounded-2xl p-6`}>
-              <h3 className="text-white font-bold text-xl mb-3">Details</h3>
-              <p className="text-blue-100 text-xs mb-2">Category</p>
+              <h3 className="text-gray-900 font-bold text-xl mb-3">Details</h3>
+              <p className="text-gray-500 text-xs mb-2">Category</p>
               <select
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
@@ -1373,7 +1493,7 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
               >
                 {SPACE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-              <p className="text-blue-100 text-xs mb-2">Capacity</p>
+              <p className="text-gray-500 text-xs mb-2">Capacity</p>
               <input
                 type="number"
                 min="1"
@@ -1387,8 +1507,8 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
 
           {/* Description */}
           <div className={`${C} rounded-2xl p-6`}>
-            <h3 className="text-white font-bold text-xl mb-1">✏️ Description</h3>
-            <p className="text-blue-100 text-sm mb-3">
+            <h3 className="text-gray-900 font-bold text-xl mb-1">✏️ Description</h3>
+            <p className="text-gray-500 text-sm mb-3">
               Describe your space for hosts and attendees.
             </p>
             <textarea
@@ -1396,7 +1516,7 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               placeholder="Write a brief description of this space…"
               rows={4}
-              className="w-full bg-transparent text-white placeholder:text-blue-200/55 resize-none outline-none text-sm leading-relaxed"
+              className="w-full bg-transparent text-gray-900 placeholder:text-gray-400 resize-none outline-none text-sm leading-relaxed"
             />
           </div>
 
