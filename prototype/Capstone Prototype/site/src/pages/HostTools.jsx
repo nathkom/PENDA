@@ -247,6 +247,8 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
   const [templatesOpen, setTemplatesOpen] = useState(true);
   const [publishError, setPublishError] = useState("");
   const [templateSaved, setTemplateSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const imageInputRef = useRef(null);
   const dragIndex = useRef(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
@@ -331,10 +333,12 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
     setTimeout(() => setTemplateSaved(false), 2000);
   }
 
-  function handlePublish() {
+  async function handlePublish() {
     if (!form.title.trim()) { setPublishError("Please add an event title before publishing."); return; }
     if (!form.date) { setPublishError("Please select a date for your event."); return; }
     setPublishError("");
+    setSaving(true);
+    setSaveSuccess(false);
 
     const timeStr =
       form.timeStart && form.timeEnd
@@ -346,35 +350,43 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
       : ["community"];
 
     const base = isEditing ? editingEvent : {};
-    onPublish({
-      ...base,
-      id: isEditing ? editingEvent.id : `evt-custom-${Date.now()}`,
-      title: form.title.trim(),
-      space_name: form.space_name || "TBD",
-      neighborhood: form.neighborhood || "Seattle",
-      category: form.category,
-      description: form.description,
-      date: form.date,
-      time: timeStr,
-      cost: form.cost,
-      cost_amount: form.cost === "paid" ? form.cost_amount : null,
-      accessibility: form.accessibility,
-      tags,
-      image_url: imagePreviews[0] || (isEditing ? editingEvent.image_url : `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`),
-      gallery_images: imagePreviews.length > 0
-        ? imagePreviews.map((url) => ({ url, alt: form.title }))
-        : (isEditing ? editingEvent.gallery_images : []),
-      contact_email: base.contact_email || "host@demo.com",
-      featured: base.featured ?? false,
-      noise_level: form.noise_level || "Community-friendly",
-      accessibility_info: form.accessibility_info || "Welcoming to all, no barriers",
-      space_format: form.space_format || "Open format",
-      crowd_level: form.crowd_level || 50,
-      attending_limit: form.attending_limit || null,
-      show_attendance: form.show_attendance,
-      hide_when_full: form.attending_limit ? form.hide_when_full : false,
-      attending_count: isEditing ? (editingEvent.attending_count || 0) : 0,
-    });
+    try {
+      await onPublish({
+        ...base,
+        id: isEditing ? editingEvent.id : `evt-custom-${Date.now()}`,
+        title: form.title.trim(),
+        space_name: form.space_name || "TBD",
+        neighborhood: form.neighborhood || "Seattle",
+        category: form.category,
+        description: form.description,
+        date: form.date,
+        time: timeStr,
+        cost: form.cost,
+        cost_amount: form.cost === "paid" ? form.cost_amount : null,
+        accessibility: form.accessibility,
+        tags,
+        image_url: imagePreviews[0] || (isEditing ? editingEvent.image_url : `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`),
+        gallery_images: imagePreviews.length > 0
+          ? imagePreviews.map((url) => ({ url, alt: form.title }))
+          : (isEditing ? editingEvent.gallery_images : []),
+        contact_email: base.contact_email || "host@demo.com",
+        featured: base.featured ?? false,
+        noise_level: form.noise_level || "Community-friendly",
+        accessibility_info: form.accessibility_info || "Welcoming to all, no barriers",
+        space_format: form.space_format || "Open format",
+        crowd_level: form.crowd_level || 50,
+        attending_limit: form.attending_limit || null,
+        show_attendance: form.show_attendance,
+        hide_when_full: form.attending_limit ? form.hide_when_full : false,
+        attending_count: isEditing ? (editingEvent.attending_count || 0) : 0,
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (err) {
+      setPublishError(err.message ?? "Failed to save — please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -942,9 +954,14 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
         <button
           type="button"
           onClick={handlePublish}
-          className="px-8 py-2.5 rounded-full bg-[#9FB366] hover:bg-[#8a9c57] text-white font-semibold text-sm transition-colors"
+          disabled={saving}
+          className={`px-8 py-2.5 rounded-full font-semibold text-sm transition-colors disabled:opacity-60 ${
+            saveSuccess
+              ? "bg-green-600 text-white"
+              : "bg-[#9FB366] hover:bg-[#8a9c57] text-white"
+          }`}
         >
-          {isEditing ? "Save Changes" : "Publish"}
+          {saving ? "Saving…" : saveSuccess ? "✓ Saved!" : isEditing ? "Save Changes" : "Publish"}
         </button>
       </div>
     </div>
@@ -1808,20 +1825,17 @@ export default function HostTools() {
   if (!user || (user.role !== "host" && user.role !== "admin")) return null;
 
   async function handlePublish(eventData) {
+    const payload = { ...eventData, host_id: user.id };
     if (editingEvent) {
-      // Optimistic local update immediately
+      console.log("[publish] updating event id:", editingEvent.id, "payload:", payload);
       updateEvent(editingEvent.id, eventData);
-      // Persist to Supabase in the background
-      updateEventInDB(editingEvent.id, eventData).catch((err) =>
-        console.warn("Failed to persist event update:", err.message),
-      );
+      const result = await updateEventInDB(editingEvent.id, payload);
+      console.log("[publish] update result:", result);
     } else {
-      // Optimistic add immediately
+      console.log("[publish] creating event, payload:", payload);
       addCreatedEvent(eventData);
-      // Persist to Supabase in the background — host_id is set server-side by trigger
-      createEventInDB(eventData).catch((err) =>
-        console.warn("Failed to persist new event:", err.message),
-      );
+      const result = await createEventInDB(payload);
+      console.log("[publish] create result:", result);
     }
     setCreateEventOpen(false);
     setEditingEvent(null);

@@ -25,7 +25,7 @@ const ALLOWED_EVENT_FIELDS = new Set([
   "image_url", "gallery_images", "contact_email", "featured",
   "noise_level", "accessibility_info", "space_format", "crowd_level",
   "attending_limit", "show_attendance", "attending_count", "hidden",
-  "hide_when_full",
+  "hide_when_full", "host_id",
 ]);
 
 function sanitizeEvent(obj) {
