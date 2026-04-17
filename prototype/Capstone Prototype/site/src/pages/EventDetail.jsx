@@ -129,8 +129,12 @@ export default function EventDetail() {
       : COST_LABEL[event.cost];
 
   const isAttending = attendingEvents.has(event.id);
+  const dbCount = event.attending_count || 0;
+  const effectiveAttendingCount = dbCount + (isAttending ? 1 : 0);
+  const isFull = !isAttending && event.attending_limit != null && dbCount >= event.attending_limit;
 
   function handleMarkAttending() {
+    if (isFull) return;
     if (!isAttending) {
       markAttending(event.id);
       setAttendPop(true);
@@ -139,8 +143,6 @@ export default function EventDetail() {
       unmarkAttending(event.id);
     }
   }
-
-  const effectiveAttendingCount = (event.attending_count || 0) + (isAttending ? 1 : 0);
 
   return (
     <main className="bg-gray-50 min-h-screen pb-16">
@@ -347,11 +349,14 @@ export default function EventDetail() {
             )}
 
             {/* Attending card */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="bg-[#5F77A5] px-6 py-5 border-b border-[#4d6592]">
-                <h2 className="text-xl font-bold text-white">Want to attend?</h2>
+            <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${isFull ? "border-gray-300" : "border-gray-200"}`}>
+              <div className={`px-6 py-5 border-b ${isFull ? "bg-gray-400 border-gray-500" : "bg-[#5F77A5] border-[#4d6592]"}`}>
+                <h2 className="text-xl font-bold text-white">
+                  {isFull ? "Attendance Full" : "Want to attend?"}
+                </h2>
               </div>
               <div className="px-6 py-5 flex flex-col gap-4">
+                {/* Capacity bar — only when show_attendance is on and a limit is set */}
                 {event.attending_limit && event.show_attendance !== false ? (
                   <div>
                     <div className="flex items-center justify-between text-sm mb-2">
@@ -360,25 +365,30 @@ export default function EventDetail() {
                     </div>
                     <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[#5F77A5] rounded-full transition-all"
+                        className={`h-full rounded-full transition-all ${isFull ? "bg-gray-400" : "bg-[#5F77A5]"}`}
                         style={{ width: `${Math.min(100, (effectiveAttendingCount / event.attending_limit) * 100)}%` }}
                       />
                     </div>
                     <p className="text-xs text-gray-400 mt-1.5">
-                      {Math.max(0, event.attending_limit - effectiveAttendingCount)} spots remaining
+                      {isFull ? "No spots remaining" : `${Math.max(0, event.attending_limit - effectiveAttendingCount)} spots remaining`}
                     </p>
                   </div>
                 ) : null}
+
+                {/* Attend button */}
                 {user ? (
                   <button
                     onClick={handleMarkAttending}
-                    className={`w-full font-semibold py-3 rounded-xl text-sm transition-all duration-200 ${attendPop ? "animate-pop" : ""} ${
-                      isAttending
-                        ? "bg-[#5F77A5] text-white"
-                        : "bg-[#9FB366] hover:bg-[#8a9c57] text-white"
+                    disabled={isFull}
+                    className={`w-full font-semibold py-3 rounded-xl text-sm transition-all duration-200 ${attendPop ? "scale-95" : ""} ${
+                      isFull
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+                        : isAttending
+                          ? "bg-[#5F77A5] text-white"
+                          : "bg-[#9FB366] hover:bg-[#8a9c57] text-white"
                     }`}
                   >
-                    {isAttending ? "✓ You're Attending!" : "Mark as Attending"}
+                    {isFull ? "Attendance is full" : isAttending ? "✓ You're Attending!" : "Mark as Attending"}
                   </button>
                 ) : (
                   <Link
@@ -388,6 +398,11 @@ export default function EventDetail() {
                     Sign in to attend
                   </Link>
                 )}
+
+                {/* Planning to attend count — always visible */}
+                <p className="text-sm text-gray-500 text-center">
+                  <span className="font-semibold text-gray-700">{effectiveAttendingCount}</span> planning to attend
+                </p>
               </div>
             </div>
           </div>

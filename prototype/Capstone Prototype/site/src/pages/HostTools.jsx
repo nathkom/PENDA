@@ -12,7 +12,9 @@ import {
   createEvent as createEventInDB,
   updateEvent as updateEventInDB,
   deleteEvent as deleteEventInDB,
+  setEventHidden as setEventHiddenInDB,
 } from "../lib/events";
+import { useEvents } from "../hooks/useEvents";
 import BookmarkedEventsSection from "../components/BookmarkedEventsSection";
 import AttendingEventsSection from "../components/AttendingEventsSection";
 
@@ -158,6 +160,7 @@ const BLANK_FORM = {
   tagsInput: "",
   attending_limit: null,
   show_attendance: true,
+  hide_when_full: false,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -219,6 +222,7 @@ function eventToForm(event) {
     tagsInput: event.tags ? event.tags.join(", ") : "",
     attending_limit: event.attending_limit ?? null,
     show_attendance: event.show_attendance !== false,
+    hide_when_full: event.hide_when_full ?? false,
     selectedSpaceId: "",
   };
 }
@@ -368,6 +372,7 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
       crowd_level: form.crowd_level || 50,
       attending_limit: form.attending_limit || null,
       show_attendance: form.show_attendance,
+      hide_when_full: form.attending_limit ? form.hide_when_full : false,
       attending_count: isEditing ? (editingEvent.attending_count || 0) : 0,
     });
   }
@@ -845,7 +850,7 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
                     <p className="text-xs text-gray-400 mt-0.5">
                       {form.show_attendance
                         ? "Attendees will see the capacity bar and spots remaining."
-                        : "Attendees only see the confirmation animation — no counts shown."}
+                        : "Attendees only see the confirmation button — no counts shown."}
                     </p>
                   </div>
                   <button
@@ -865,6 +870,41 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
                     />
                   </button>
                 </div>
+
+                {/* When full behaviour toggle — only relevant when a limit is set */}
+                {form.attending_limit && (
+                  <div className="flex items-center justify-between gap-4 py-3 border-t border-gray-100">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700">When attendance limit is reached</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {form.hide_when_full
+                          ? "Event will be hidden from the feed once full."
+                          : "Event stays posted — attendance button is locked for new attendees."}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, hide_when_full: !f.hide_when_full }))}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${
+                          form.hide_when_full ? "bg-[#5F77A5]" : "bg-gray-300"
+                        }`}
+                        role="switch"
+                        aria-checked={form.hide_when_full}
+                        aria-label="Hide event when full"
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                            form.hide_when_full ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                      <span className="text-[11px] text-gray-400">
+                        {form.hide_when_full ? "Hide when full" : "Keep posted"}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1147,16 +1187,16 @@ function TemplatesSection({ templates, onCreateTemplate, onUseTemplate }) {
 
 // ─── Events Section ───────────────────────────────────────────────────────────
 
-function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent }) {
+function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent, onToggleHide, isAdmin }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null); // event object to confirm
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Your Events</h2>
+          <h2 className="text-lg font-bold text-gray-900">{isAdmin ? "All Events" : "Your Events"}</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            {hostEvents.length} event{hostEvents.length !== 1 ? "s" : ""} posted
+            {hostEvents.length} event{hostEvents.length !== 1 ? "s" : ""} {isAdmin ? "on the site" : "posted"}
           </p>
         </div>
         <button
@@ -1184,9 +1224,15 @@ function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent }
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-0.5">
                   <h3 className="font-semibold text-gray-900 text-sm truncate">{event.title}</h3>
-                  <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
-                    Published
-                  </span>
+                  {event.hidden ? (
+                    <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
+                      Hidden
+                    </span>
+                  ) : (
+                    <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+                      Published
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-gray-500 truncate">{event.space_name} · {event.neighborhood}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{dateStr} · {event.time}</p>
@@ -1214,6 +1260,18 @@ function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent }
                   <Eye size={13} />
                   <span className="hidden sm:inline">View</span>
                 </Link>
+                <button
+                  onClick={() => onToggleHide(event)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors font-medium ${
+                    event.hidden
+                      ? "border-[#9FB366] text-[#9FB366] hover:bg-green-50"
+                      : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                  }`}
+                  title={event.hidden ? "Show event publicly" : "Hide event from public"}
+                >
+                  {event.hidden ? <Eye size={13} /> : <EyeOff size={13} />}
+                  <span className="hidden sm:inline">{event.hidden ? "Show" : "Hide"}</span>
+                </button>
                 <button
                   onClick={() => setDeleteConfirm(event)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm transition-colors font-medium"
@@ -1727,7 +1785,8 @@ const NAV_SECTIONS = [
 ];
 
 export default function HostTools() {
-  const { user, setUser, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, deleteEvent, updateEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, deleteCreatedSpace, updateCreatedSpace, hostTemplates, addHostTemplate } = useUser();
+  const { user, setUser, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, deleteEvent, updateEvent, hiddenEventIds, hideEvent, showEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, deleteCreatedSpace, updateCreatedSpace, hostTemplates, addHostTemplate } = useUser();
+  const { events: allDbEvents } = useEvents();
   const templates = [...INITIAL_TEMPLATES, ...hostTemplates];
   const navigate = useNavigate();
   const location = useLocation();
@@ -1738,28 +1797,29 @@ export default function HostTools() {
   const [createEventOpen, setCreateEventOpen] = useState(false);
   const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
+  const [hideToast, setHideToast] = useState(null);
   const [editingSpace, setEditingSpace] = useState(null);
   const [initialTemplate, setInitialTemplate] = useState(null);
 
   useEffect(() => {
-    if (!user || user.role !== "host") navigate("/signin");
+    if (!user || (user.role !== "host" && user.role !== "admin")) navigate("/signin");
   }, [user, navigate]);
 
-  if (!user || user.role !== "host") return null;
+  if (!user || (user.role !== "host" && user.role !== "admin")) return null;
 
   async function handlePublish(eventData) {
     if (editingEvent) {
       // Optimistic local update immediately
       updateEvent(editingEvent.id, eventData);
       // Persist to Supabase in the background
-      updateEventInDB(editingEvent.id, { ...eventData, host_id: user.id }).catch((err) =>
+      updateEventInDB(editingEvent.id, eventData).catch((err) =>
         console.warn("Failed to persist event update:", err.message),
       );
     } else {
       // Optimistic add immediately
       addCreatedEvent(eventData);
-      // Persist to Supabase in the background
-      createEventInDB({ ...eventData, host_id: user.id }).catch((err) =>
+      // Persist to Supabase in the background — host_id is set server-side by trigger
+      createEventInDB(eventData).catch((err) =>
         console.warn("Failed to persist new event:", err.message),
       );
     }
@@ -1775,6 +1835,27 @@ export default function HostTools() {
     setCreateEventOpen(true);
   }
 
+  function handleToggleHide(event) {
+    const next = !event.hidden;
+    // Optimistic update — flips badge and button text immediately
+    updateEvent(event.id, { ...event, hidden: next });
+    next ? hideEvent(event.id) : showEvent(event.id);
+
+    setEventHiddenInDB(event.id, next)
+      .then(() => {
+        setHideToast({ message: next ? "Event hidden from public" : "Event is now visible", ok: true });
+        setTimeout(() => setHideToast(null), 3000);
+      })
+      .catch((err) => {
+        // Roll back on failure
+        updateEvent(event.id, { ...event, hidden: !next });
+        next ? showEvent(event.id) : hideEvent(event.id);
+        setHideToast({ message: "Failed to update visibility — check your connection", ok: false });
+        setTimeout(() => setHideToast(null), 4000);
+        console.warn("Failed to persist visibility change:", err.message);
+      });
+  }
+
   function handleUseTemplate(tpl) {
     setEditingEvent(null);
     setInitialTemplate(tpl);
@@ -1787,13 +1868,14 @@ export default function HostTools() {
     setInitialTemplate(null);
   }
 
-  // Host's own events (for the Your Events section)
+  // Admin sees all DB events; host sees only their own
   const allHostEvents = useMemo(() => {
+    if (user.role === "admin") return allDbEvents;
     const staticHost = staticEvents.filter((e) => HOST_EVENT_IDS.includes(e.id));
     const merged = [...createdEvents, ...staticHost];
     const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
     return filtered.map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e));
-  }, [createdEvents, deletedEventIds, editedEvents]);
+  }, [user.role, allDbEvents, createdEvents, deletedEventIds, editedEvents]);
 
   // Full catalog (for the Bookmarked Events section)
   const allCatalogEvents = useMemo(() => {
@@ -1844,6 +1926,15 @@ export default function HostTools() {
 
   return (
     <main className="bg-gray-50 min-h-screen">
+      {/* Visibility toast */}
+      <div
+        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-4 py-2.5 rounded-full shadow-lg text-sm font-medium pointer-events-none transition-all duration-300 ${
+          hideToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+        } ${hideToast?.ok ? "bg-gray-900 text-white" : "bg-red-600 text-white"}`}
+      >
+        {hideToast?.message}
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row gap-6">
 
@@ -1877,7 +1968,7 @@ export default function HostTools() {
                   </div>
                   <div>
                     <p className="font-bold text-gray-900 text-base leading-tight">{user.name}</p>
-                    <p className="text-sm text-[#9FB366] font-medium mt-0.5">Event Host</p>
+                    <p className="text-sm text-[#9FB366] font-medium mt-0.5">{user.role === "admin" ? "Administrator" : "Event Host"}</p>
                     <p className="text-xs text-gray-400 mt-0.5">Seattle, WA</p>
                   </div>
                 </div>
@@ -1955,6 +2046,8 @@ export default function HostTools() {
                     console.warn("Failed to delete event from DB:", err.message),
                   );
                 }}
+                onToggleHide={handleToggleHide}
+                isAdmin={user.role === "admin"}
               />
             )}
             {activeSection === "bookmarks" && (

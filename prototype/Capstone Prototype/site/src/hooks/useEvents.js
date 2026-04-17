@@ -3,7 +3,7 @@ import { fetchAllEvents } from "../lib/events";
 import { useUser } from "../context/UserContext";
 
 export function useEvents() {
-  const { createdEvents, deletedEventIds, editedEvents, attendingEvents } = useUser();
+  const { createdEvents, deletedEventIds, editedEvents, attendingEvents, hiddenEventIds, user } = useUser();
   const [dbEvents, setDbEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -50,16 +50,18 @@ export function useEvents() {
       ...createdEvents,
       ...dbEvents.filter((e) => !optimisticIds.has(e.id)),
     ];
+    const isAdmin = user?.role === "admin";
     return base
       .filter((e) => !deletedEventIds.has(e.id))
       .map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e))
-      .filter(
-        (e) =>
-          !e.attending_limit ||
-          (e.attending_count || 0) + (attendingEvents.has(e.id) ? 1 : 0) <
-            e.attending_limit,
-      );
-  }, [dbEvents, createdEvents, deletedEventIds, editedEvents, attendingEvents]);
+      .filter((e) => isAdmin || (!e.hidden && !hiddenEventIds.has(e.id)))
+      .filter((e) => {
+        if (!e.hide_when_full || !e.attending_limit || isAdmin) return true;
+        // Keep the event visible if the current user is already attending
+        if (attendingEvents.has(e.id)) return true;
+        return (e.attending_count || 0) < e.attending_limit;
+      });
+  }, [dbEvents, createdEvents, deletedEventIds, editedEvents, attendingEvents, hiddenEventIds, user?.role]);
 
   return { events, loading, error, refetch: load };
 }

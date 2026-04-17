@@ -228,8 +228,8 @@ export default function NavBar() {
             ))}
           </div>
 
-          {/* Create + button (hosts only) */}
-          {user?.role === "host" && (
+          {/* Create + button (hosts + admins) */}
+          {(user?.role === "host" || user?.role === "admin") && (
             <button
               onClick={() =>
                 navigate("/host", { state: { section: "events" } })
@@ -261,12 +261,12 @@ export default function NavBar() {
                       {user.name}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {user.role === "host" ? "Event Host" : "Member"}
+                      {user.role === "admin" ? "Administrator" : user.role === "host" ? "Event Host" : "Member"}
                     </p>
                   </div>
 
-                  {/* Host Tools — only visible to hosts */}
-                  {user.role === "host" && (
+                  {/* Host Tools — visible to hosts and admins */}
+                  {(user.role === "host" || user.role === "admin") && (
                     <button
                       onClick={() => {
                         setProfileOpen(false);
@@ -385,12 +385,12 @@ export default function NavBar() {
                       {user.name}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {user.role === "host" ? "Event Host" : "Member"}
+                      {user.role === "admin" ? "Administrator" : user.role === "host" ? "Event Host" : "Member"}
                     </p>
                   </div>
                 </div>
 
-                {user.role === "host" && (
+                {(user.role === "host" || user.role === "admin") && (
                   <>
                     <button
                       onClick={() => {
@@ -406,7 +406,7 @@ export default function NavBar() {
                       className={mobileLinkClass}
                       onClick={() => setMenuOpen(false)}
                     >
-                      Host Tools
+                      {user.role === "admin" ? "Admin Panel" : "Host Tools"}
                     </NavLink>
                   </>
                 )}

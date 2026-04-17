@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import { fetchUserAttendance, markAttendance, unmarkAttendance } from "../lib/events";
 
 const UserContext = createContext(null);
 
@@ -32,19 +33,35 @@ export function UserProvider({ children }) {
   }, []);
 
   async function fetchAndSetProfile(authUser) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("full_name, role")
-      .eq("id", authUser.id)
-      .single();
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, role")
+        .eq("id", authUser.id)
+        .single();
 
-    setUser({
-      id:    authUser.id,
-      email: authUser.email,
-      name:  profile?.full_name ?? authUser.email.split("@")[0],
-      role:  profile?.role ?? "user",
-    });
-    setAuthLoading(false);
+      console.log("[auth] profile loaded:", profile);
+
+      const attendedIds = await fetchUserAttendance(authUser.id).catch(() => []);
+
+      setUser({
+        id:    authUser.id,
+        email: authUser.email,
+        name:  profile?.full_name ?? authUser.email.split("@")[0],
+        role:  profile?.role ?? "user",
+      });
+      setAttendingEvents(new Set(attendedIds));
+    } catch (err) {
+      console.error("[auth] fetchAndSetProfile failed:", err);
+      setUser({
+        id:    authUser.id,
+        email: authUser.email,
+        name:  authUser.email.split("@")[0],
+        role:  "user",
+      });
+    } finally {
+      setAuthLoading(false);
+    }
   }
 
   // ── Auth actions ──────────────────────────────────────────────────────────────
@@ -52,13 +69,14 @@ export function UserProvider({ children }) {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
 
-    // Insert profile row (role + display name)
+    // Insert profile row — role is validated to prevent admin self-assignment
     if (data.user) {
+      const safeRole = role === "host" ? "host" : "user";
       const { error: profileError } = await supabase.from("profiles").insert({
         id:        data.user.id,
         email,
         full_name: fullName,
-        role,
+        role:      safeRole,
       });
       if (profileError) throw profileError;
     }
@@ -81,6 +99,7 @@ export function UserProvider({ children }) {
   const [createdEvents, setCreatedEvents] = useState([]);
   const [deletedEventIds, setDeletedEventIds] = useState(new Set());
   const [editedEvents, setEditedEvents] = useState({});
+  const [hiddenEventIds, setHiddenEventIds] = useState(new Set());
   const [createdSpaces, setCreatedSpaces] = useState([]);
 
   const [hostTemplates, setHostTemplates] = useState([]);
@@ -114,6 +133,13 @@ export function UserProvider({ children }) {
     setCreatedEvents((prev) => prev.filter((e) => e.id !== id));
     setDeletedEventIds((prev) => new Set([...prev, id]));
   }
+  function hideEvent(id) {
+    setHiddenEventIds((prev) => new Set([...prev, id]));
+  }
+  function showEvent(id) {
+    setHiddenEventIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+  }
+
   function updateEvent(id, updatedEvent) {
     setCreatedEvents((prev) => {
       const idx = prev.findIndex((e) => e.id === id);
@@ -173,9 +199,17 @@ export function UserProvider({ children }) {
 
   function markAttending(eventId) {
     setAttendingEvents((prev) => new Set([...prev, eventId]));
+    markAttendance(eventId).catch((err) => {
+      setAttendingEvents((prev) => { const next = new Set(prev); next.delete(eventId); return next; });
+      console.warn("Failed to mark attendance:", err.message);
+    });
   }
   function unmarkAttending(eventId) {
     setAttendingEvents((prev) => { const next = new Set(prev); next.delete(eventId); return next; });
+    unmarkAttendance(eventId).catch((err) => {
+      setAttendingEvents((prev) => new Set([...prev, eventId]));
+      console.warn("Failed to unmark attendance:", err.message);
+    });
   }
 
   return (
@@ -188,6 +222,7 @@ export function UserProvider({ children }) {
         createdEvents, addCreatedEvent,
         deletedEventIds, deleteEvent,
         editedEvents, updateEvent,
+        hiddenEventIds, hideEvent, showEvent,
         bookmarkedEvents, toggleBookmark,
         bookmarkGroups, addBookmarkGroup, removeBookmarkGroup,
         eventGroupMap, addEventToGroup, removeEventFromGroup,
