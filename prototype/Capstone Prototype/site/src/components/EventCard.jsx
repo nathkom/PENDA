@@ -1,5 +1,6 @@
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { MapPin, Calendar, Clock, Bookmark, CalendarPlus, Share2 } from "lucide-react";
+import { MapPin, Calendar, Clock, Bookmark, CalendarPlus, Share2, Check, Download } from "lucide-react";
 
 const COST_BADGE = {
   free: "bg-green-100 text-green-700",
@@ -23,9 +24,199 @@ function formatDate(dateStr) {
   });
 }
 
+// ── Calendar helpers ──────────────────────────────────────────────────────────
+
+function parseTo24(t) {
+  const m = t.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return null;
+  let h = +m[1];
+  const min = +m[2];
+  const mer = m[3].toUpperCase();
+  if (mer === "PM" && h !== 12) h += 12;
+  if (mer === "AM" && h === 12) h = 0;
+  return { h, min };
+}
+
+function toIcsDate(dateStr, t24) {
+  const [y, mo, d] = dateStr.split("-");
+  return `${y}${mo}${d}T${String(t24.h).padStart(2, "0")}${String(t24.min).padStart(2, "0")}00`;
+}
+
+function getEventTimes(dateStr, timeStr) {
+  if (!dateStr || !timeStr || timeStr === "TBD") return null;
+  const parts = timeStr.split(/\s*[–—-]\s*/);
+  const start = parseTo24(parts[0]);
+  if (!start) return null;
+  const end = parts[1] ? parseTo24(parts[1]) : { h: start.h + 1, min: start.min };
+  return {
+    start: toIcsDate(dateStr, start),
+    end: toIcsDate(dateStr, end || { h: start.h + 1, min: start.min }),
+  };
+}
+
+function googleCalUrl(event) {
+  const times = getEventTimes(event.date, event.time);
+  const base = "https://calendar.google.com/calendar/render?action=TEMPLATE";
+  const title = encodeURIComponent(event.title || "Event");
+  const location = encodeURIComponent(event.space_name || "");
+  if (!times) {
+    const d = (event.date || "").replace(/-/g, "");
+    return `${base}&text=${title}&dates=${d}/${d}&location=${location}`;
+  }
+  return `${base}&text=${title}&dates=${times.start}/${times.end}&location=${location}`;
+}
+
+function buildIcs(event) {
+  const times = getEventTimes(event.date, event.time);
+  const d = (event.date || "").replace(/-/g, "");
+  const start = times ? times.start : `${d}T000000`;
+  const end = times ? times.end : `${d}T235900`;
+  const uid = `${event.id}@thirdspace`;
+  const now = new Date().toISOString().replace(/[-:.]/g, "").slice(0, 15) + "Z";
+  const esc = (s) => (s || "").replace(/[,;\\]/g, "\\$&").replace(/\n/g, "\\n");
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//ThirdSpace//Event//EN",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${now}`,
+    `DTSTART:${start}`,
+    `DTEND:${end}`,
+    `SUMMARY:${esc(event.title)}`,
+    `LOCATION:${esc(event.space_name)}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+}
+
+function downloadIcs(event) {
+  const blob = new Blob([buildIcs(event)], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${(event.title || "event").replace(/\s+/g, "-").toLowerCase()}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Shared action hook ────────────────────────────────────────────────────────
+
+function useEventActions(event) {
+  const [calOpen, setCalOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const calRef = useRef(null);
+
+  useEffect(() => {
+    if (!calOpen) return;
+    function handleOutside(e) {
+      if (calRef.current && !calRef.current.contains(e.target)) {
+        setCalOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [calOpen]);
+
+  async function handleShare(e) {
+    e.preventDefault();
+    const url = `${window.location.origin}${import.meta.env.BASE_URL}events/${event.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = url;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return { calOpen, setCalOpen, calRef, copied, handleShare };
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function CopiedToast({ visible }) {
+  return (
+    <div
+      className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-4 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-full shadow-lg pointer-events-none transition-all duration-300 ${
+        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+      }`}
+    >
+      Link copied to clipboard
+    </div>
+  );
+}
+
+// ── Calendar dropdown ─────────────────────────────────────────────────────────
+
+function CalendarDropdown({ event, calRef, calOpen, setCalOpen }) {
+  return (
+    <div ref={calRef} className="relative">
+      <button
+        onClick={(e) => { e.preventDefault(); setCalOpen((o) => !o); }}
+        className={`p-2.5 rounded-lg border transition-colors ${
+          calOpen
+            ? "border-[#9FB366] text-[#9FB366] bg-green-50"
+            : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500"
+        }`}
+        aria-label="Add to calendar"
+      >
+        <CalendarPlus size={16} />
+      </button>
+
+      {calOpen && (
+        <div className="absolute bottom-full right-0 mb-1.5 w-48 bg-white rounded-xl border border-gray-200 shadow-lg z-50 overflow-hidden">
+          <p className="px-3.5 pt-2.5 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+            Add to calendar
+          </p>
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(googleCalUrl(event), "_blank", "noopener,noreferrer"); setCalOpen(false); }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <img
+              src="https://www.google.com/favicon.ico"
+              alt=""
+              className="w-3.5 h-3.5 rounded-sm"
+              onError={(e) => { e.target.style.display = "none"; }}
+            />
+            Google Calendar
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); downloadIcs(event); setCalOpen(false); }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Download size={13} className="text-gray-400 shrink-0" />
+            Apple Calendar
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); downloadIcs(event); setCalOpen(false); }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 pb-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Download size={13} className="text-gray-400 shrink-0" />
+            Outlook
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Feed card (horizontal, h-220) — used on Home ─────────────────────────────
 function FeedCard({ event, costClass, costLabel, liked, likeCount, onToggleLike, bookmarked, onToggleBookmark }) {
+  const { calOpen, setCalOpen, calRef, copied, handleShare } = useEventActions(event);
+
   return (
+    <>
     <Link
       to={`/events/${event.id}`}
       className="block bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow group h-[220px]"
@@ -107,10 +298,7 @@ function FeedCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
             </div>
 
             {/* Action buttons */}
-            <div
-              className="flex gap-1 shrink-0"
-              onClick={(e) => e.preventDefault()}
-            >
+            <div className="flex gap-1 shrink-0" onClick={(e) => e.preventDefault()}>
               <button
                 onClick={() => onToggleBookmark?.(event.id)}
                 className={`p-2.5 rounded-lg border transition-colors ${
@@ -122,29 +310,36 @@ function FeedCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
               >
                 <Bookmark size={16} />
               </button>
+
+              <CalendarDropdown event={event} calRef={calRef} calOpen={calOpen} setCalOpen={setCalOpen} />
+
               <button
-                className="p-2.5 rounded-lg border border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500 transition-colors"
-                aria-label="Add to calendar"
+                onClick={handleShare}
+                className={`p-2.5 rounded-lg border transition-colors ${
+                  copied
+                    ? "border-[#9FB366] text-[#9FB366] bg-green-50"
+                    : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500"
+                }`}
+                aria-label={copied ? "Link copied!" : "Share event"}
               >
-                <CalendarPlus size={16} />
-              </button>
-              <button
-                className="p-2.5 rounded-lg border border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500 transition-colors"
-                aria-label="Share event"
-              >
-                <Share2 size={16} />
+                {copied ? <Check size={16} /> : <Share2 size={16} />}
               </button>
             </div>
           </div>
         </div>
       </div>
     </Link>
+    <CopiedToast visible={copied} />
+  </>
   );
 }
 
 // ── Grid card (vertical) — used on Events page ────────────────────────────────
 function GridCard({ event, costClass, costLabel, liked, likeCount, onToggleLike, bookmarked, onToggleBookmark }) {
+  const { calOpen, setCalOpen, calRef, copied, handleShare } = useEventActions(event);
+
   return (
+    <>
     <Link
       to={`/events/${event.id}`}
       className="group flex flex-col bg-white rounded-2xl border border-gray-200 hover:border-green-300 hover:shadow-lg transition-all overflow-hidden"
@@ -219,10 +414,26 @@ function GridCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
             >
               <Bookmark size={16} />
             </button>
+
+            <CalendarDropdown event={event} calRef={calRef} calOpen={calOpen} setCalOpen={setCalOpen} />
+
+            <button
+              onClick={handleShare}
+              className={`p-2.5 rounded-lg border transition-colors ${
+                copied
+                  ? "border-[#9FB366] text-[#9FB366] bg-green-50"
+                  : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500"
+              }`}
+              aria-label={copied ? "Link copied!" : "Share event"}
+            >
+              {copied ? <Check size={16} /> : <Share2 size={16} />}
+            </button>
           </div>
         </div>
       </div>
     </Link>
+    <CopiedToast visible={copied} />
+    </>
   );
 }
 
