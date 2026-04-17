@@ -1,7 +1,7 @@
 import { useState, useRef, useLayoutEffect } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { bulletins, BULLETIN_IMAGE } from "../data/bulletin";
+import { bulletins } from "../data/bulletin";
 
 // Clickable zone coords generated for a 2120 × 1196 image
 const MAP_W = 2120;
@@ -27,7 +27,7 @@ const ZONES = [
 const CARD_RATIO = 0.55;
 const GAP = 24; // px between cards
 
-const DEFAULT_INDEX = bulletins.findIndex(b => b.id === "mar-2026");
+const DEFAULT_INDEX = bulletins.findIndex(b => b.id === "feb-2026");
 
 export default function BulletinBoard() {
   const [activeIndex, setActiveIndex] = useState(DEFAULT_INDEX >= 0 ? DEFAULT_INDEX : 0);
@@ -54,7 +54,7 @@ export default function BulletinBoard() {
   const canNext = activeIndex < bulletins.length - 1;
 
   return (
-    <section className="py-8" aria-label="Bulletin Board of the Month">
+    <section className="pt-8 pb-4" aria-label="Bulletin Board of the Month">
       {/* Heading stays in the normal content column */}
       <div className="max-w-7xl mx-auto px-4">
         <h2 className="text-2xl font-bold text-gray-900 text-center mb-5">
@@ -78,7 +78,7 @@ export default function BulletinBoard() {
             >
               <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-lg">
                 <img
-                  src={`${import.meta.env.BASE_URL}${BULLETIN_IMAGE}`}
+                  src={`${import.meta.env.BASE_URL}${b.image}`}
                   alt={`Bulletin Board — ${b.month}`}
                   className="w-full h-full object-cover block"
                   draggable={false}

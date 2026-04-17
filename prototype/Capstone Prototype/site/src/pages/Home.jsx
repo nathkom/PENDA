@@ -71,7 +71,7 @@ if (sortType === "mostLiked") {
       <div className="border-t border-gray-100" />
 
       {/* Section B — Event Feed */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 pt-4 pb-8">
         {/* Feed header */}
 <div className="flex items-center justify-between mb-6">
   <h2 className="text-2xl font-bold text-gray-900">
