@@ -113,8 +113,10 @@ export async function fetchEventAttendees(eventId) {
   return data ?? [];
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function trackAnalytic(eventId, action, userId = null) {
-  // Fire-and-forget — don't block the UI on analytics writes
+  if (!eventId || !UUID_RE.test(String(eventId))) return;
   supabase
     .from("event_analytics")
     .insert([{ event_id: eventId, action, user_id: userId || null }])

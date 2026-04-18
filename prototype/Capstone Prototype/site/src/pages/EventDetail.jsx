@@ -81,9 +81,13 @@ export default function EventDetail() {
   const [attendPop, setAttendPop] = useState(false);
 
   function toggleLike(eventId) {
-    const updated = { ...likedEvents, [eventId]: !likedEvents[eventId] };
+    const newLiked = !likedEvents[eventId];
+    const updated = { ...likedEvents, [eventId]: newLiked };
     setLikedEvents(updated);
     localStorage.setItem("likedEvents", JSON.stringify(updated));
+    if (newLiked) {
+      trackAnalytic(eventId, "like", user?.id ?? null);
+    }
   }
 
   function getLikeCount(e) {

@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 import { useUser } from "../context/UserContext";
 import { useEvents } from "../hooks/useEvents";
+import { trackAnalytic } from "../lib/events";
 import { filterEvents } from "../utils/filters";
 import BulletinBoard from "../components/BulletinBoard";
 import FilterCard from "../components/FilterCard";
@@ -28,13 +29,18 @@ const [likedEvents, setLikedEvents] = useState(() => {
 });
 
 const toggleLike = (eventId) => {
+  const newLiked = !likedEvents[eventId];
   const updated = {
     ...likedEvents,
-    [eventId]: !likedEvents[eventId],
+    [eventId]: newLiked,
   };
 
   setLikedEvents(updated);
   localStorage.setItem("likedEvents", JSON.stringify(updated));
+
+  if (newLiked) {
+    trackAnalytic(eventId, "like", user?.id ?? null);
+  }
 };
 
 const getLikeCount = (event) => {

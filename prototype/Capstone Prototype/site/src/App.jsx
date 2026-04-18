@@ -10,6 +10,7 @@ import SpaceDetail from "./pages/SpaceDetail";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import HostTools from "./pages/HostTools";
+import HostAnalytics from "./pages/HostAnalytics";
 import UserDashboard from "./pages/UserDashboard";
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
               <Route path="/signin" element={<SignIn />} />
               <Route path="/signup" element={<SignUp />} />
               <Route path="/host" element={<HostTools />} />
+              <Route path="/host/analytics" element={<HostAnalytics />} />
               <Route path="/dashboard" element={<UserDashboard />} />
             </Routes>
           </div>

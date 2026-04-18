@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { fetchUserAttendance, markAttendance, unmarkAttendance } from "../lib/events";
+import { fetchUserAttendance, markAttendance, unmarkAttendance, trackAnalytic } from "../lib/events";
 
 const UserContext = createContext(null);
 
@@ -160,6 +160,7 @@ export function UserProvider({ children }) {
       } else {
         next.add(eventId);
         setEventGroupMap((g) => ({ ...g, [eventId]: ["default"] }));
+        trackAnalytic(eventId, "bookmark", user?.id ?? null);
       }
       localStorage.setItem("bookmarkedEvents", JSON.stringify([...next]));
       return next;

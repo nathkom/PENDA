@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   User, FileText, Calendar, Camera, Building2, Mail, Lock,
   Globe, Plus, Edit2, Eye, EyeOff, ChevronRight,
-  Upload, MapPin, X, Check, Trash2, Bookmark, CalendarCheck, Users,
+  Upload, MapPin, X, Check, Trash2, Bookmark, CalendarCheck, Users, BarChart3,
 } from "lucide-react";
 import { useUser } from "../context/UserContext";
 import { events as staticEvents } from "../data/events";
@@ -1970,6 +1970,13 @@ export default function HostTools() {
                   {label}
                 </button>
               ))}
+              <Link
+                to="/host/analytics"
+                className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors bg-white border border-gray-200 text-gray-700 hover:border-[#9FB366]/50"
+              >
+                <BarChart3 size={14} />
+                Analytics
+              </Link>
             </div>
 
             {/* Desktop: sidebar card */}
@@ -2028,6 +2035,19 @@ export default function HostTools() {
                   </button>
                 );
               })}
+              <Link
+                to="/host/analytics"
+                className="w-full flex items-center gap-4 px-5 py-4 text-left transition-colors border-t border-gray-100 hover:bg-gray-50"
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-gray-100">
+                  <BarChart3 size={18} className="text-gray-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold leading-tight text-gray-800">Analytics</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Per-event performance</p>
+                </div>
+                <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
+              </Link>
             </div>
           </aside>
 
