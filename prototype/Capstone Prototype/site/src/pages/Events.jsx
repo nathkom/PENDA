@@ -20,6 +20,7 @@ import EmptyState from "../components/EmptyState";
 import NeighborhoodsMap from "../components/NeighborhoodsMap";
 import { useUser } from "../context/UserContext";
 import { useEvents } from "../hooks/useEvents";
+import { trackAnalytic } from "../lib/events";
 
 const COST_LABEL = {
   free: "Free",
@@ -351,7 +352,7 @@ function FilterSidebar({ filters, onChange }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Events() {
-  const { bookmarkedEvents, toggleBookmark } = useUser();
+  const { user, bookmarkedEvents, toggleBookmark } = useUser();
   const { events, loading } = useEvents();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -377,9 +378,13 @@ export default function Events() {
   });
 
   function toggleLike(eventId) {
-    const updated = { ...likedEvents, [eventId]: !likedEvents[eventId] };
+    const newLiked = !likedEvents[eventId];
+    const updated = { ...likedEvents, [eventId]: newLiked };
     setLikedEvents(updated);
     localStorage.setItem("likedEvents", JSON.stringify(updated));
+    if (newLiked) {
+      trackAnalytic(eventId, "like", user?.id ?? null);
+    }
   }
 
   function getLikeCount(event) {
