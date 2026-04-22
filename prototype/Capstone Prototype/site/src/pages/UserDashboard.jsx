@@ -159,7 +159,7 @@ function UserProfileSection({ user, setUser }) {
 
 export default function UserDashboard() {
   const {
-    user, setUser,
+    user, setUser, authLoading,
     createdEvents, deletedEventIds, editedEvents,
     bookmarkedEvents, toggleBookmark,
     bookmarkGroups, addBookmarkGroup, removeBookmarkGroup,
@@ -175,9 +175,11 @@ export default function UserDashboard() {
   });
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) navigate("/signin");
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
+  if (authLoading) return null;
   if (!user) return null;
 
   const allCatalogEvents = useMemo(() => {

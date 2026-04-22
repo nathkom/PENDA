@@ -129,6 +129,15 @@ export function UserProvider({ children }) {
   function addCreatedEvent(event) {
     setCreatedEvents((prev) => [event, ...prev]);
   }
+  function replaceCreatedEvent(tempId, realEvent) {
+    setCreatedEvents((prev) => prev.map((e) => (e.id === tempId ? realEvent : e)));
+    setEditedEvents((prev) => {
+      if (!prev[tempId]) return prev;
+      const next = { ...prev, [realEvent.id]: prev[tempId] };
+      delete next[tempId];
+      return next;
+    });
+  }
   function deleteEvent(id) {
     setCreatedEvents((prev) => prev.filter((e) => e.id !== id));
     setDeletedEventIds((prev) => new Set([...prev, id]));
@@ -219,7 +228,7 @@ export function UserProvider({ children }) {
         signUp, signIn, signOut,
         createdSpaces, setCreatedSpaces, addCreatedSpace, deleteCreatedSpace, updateCreatedSpace,
         hostTemplates, addHostTemplate,
-        createdEvents, addCreatedEvent,
+        createdEvents, addCreatedEvent, replaceCreatedEvent,
         deletedEventIds, deleteEvent,
         editedEvents, updateEvent,
         hiddenEventIds, hideEvent, showEvent,

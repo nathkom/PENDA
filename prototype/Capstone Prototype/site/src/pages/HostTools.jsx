@@ -13,6 +13,7 @@ import {
   updateEvent as updateEventInDB,
   deleteEvent as deleteEventInDB,
   setEventHidden as setEventHiddenInDB,
+  uploadEventImage,
 } from "../lib/events";
 import { useEvents } from "../hooks/useEvents";
 import BookmarkedEventsSection from "../components/BookmarkedEventsSection";
@@ -252,6 +253,8 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
   const imageInputRef = useRef(null);
   const dragIndex = useRef(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
+  // Maps blob URL → File so we can upload the right file even after reordering
+  const imageFilesMap = useRef(new Map());
 
   const C = "bg-white border border-gray-200 shadow-sm";
   const inputCls =
@@ -262,7 +265,11 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
   function handleImageUpload(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    const urls = files.map((f) => URL.createObjectURL(f));
+    const urls = files.map((f) => {
+      const url = URL.createObjectURL(f);
+      imageFilesMap.current.set(url, f);
+      return url;
+    });
     setImagePreviews((prev) => [...prev, ...urls]);
   }
 
@@ -350,10 +357,31 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
       : ["community"];
 
     const base = isEditing ? editingEvent : {};
+    const eventId = isEditing ? editingEvent.id : crypto.randomUUID();
+
     try {
+      // Resolve blob URLs → permanent storage URLs (base64 fallback if storage unavailable)
+      const resolvedPreviews = await Promise.all(
+        imagePreviews.map(async (url) => {
+          if (!url.startsWith("blob:")) return url;
+          const file = imageFilesMap.current.get(url);
+          if (!file) return url;
+          try {
+            return await uploadEventImage(file, eventId);
+          } catch {
+            // Storage not configured — encode as base64 so image still persists
+            return await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.readAsDataURL(file);
+            });
+          }
+        })
+      );
+
       await onPublish({
         ...base,
-        id: isEditing ? editingEvent.id : `evt-custom-${Date.now()}`,
+        id: eventId,
         title: form.title.trim(),
         space_name: form.space_name || "TBD",
         neighborhood: form.neighborhood || "Seattle",
@@ -365,9 +393,9 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
         cost_amount: form.cost === "paid" ? form.cost_amount : null,
         accessibility: form.accessibility,
         tags,
-        image_url: imagePreviews[0] || (isEditing ? editingEvent.image_url : `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`),
-        gallery_images: imagePreviews.length > 0
-          ? imagePreviews.map((url) => ({ url, alt: form.title }))
+        image_url: resolvedPreviews[0] || (isEditing ? editingEvent.image_url : `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`),
+        gallery_images: resolvedPreviews.length > 0
+          ? resolvedPreviews.map((url) => ({ url, alt: form.title }))
           : (isEditing ? editingEvent.gallery_images : []),
         contact_email: base.contact_email || "host@demo.com",
         featured: base.featured ?? false,
@@ -1802,7 +1830,7 @@ const NAV_SECTIONS = [
 ];
 
 export default function HostTools() {
-  const { user, setUser, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, deleteEvent, updateEvent, hiddenEventIds, hideEvent, showEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, deleteCreatedSpace, updateCreatedSpace, hostTemplates, addHostTemplate } = useUser();
+  const { user, setUser, authLoading, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, replaceCreatedEvent, deleteEvent, updateEvent, hiddenEventIds, hideEvent, showEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, deleteCreatedSpace, updateCreatedSpace, hostTemplates, addHostTemplate } = useUser();
   const { events: allDbEvents } = useEvents();
   const templates = [...INITIAL_TEMPLATES, ...hostTemplates];
   const navigate = useNavigate();
@@ -1811,7 +1839,7 @@ export default function HostTools() {
     const s = location.state?.section;
     return ["events", "templates", "spaces", "profile", "bookmarks", "attending"].includes(s) ? s : "profile";
   });
-  const [createEventOpen, setCreateEventOpen] = useState(false);
+  const [createEventOpen, setCreateEventOpen] = useState(() => Boolean(location.state?.create));
   const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [hideToast, setHideToast] = useState(null);
@@ -1819,23 +1847,32 @@ export default function HostTools() {
   const [initialTemplate, setInitialTemplate] = useState(null);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user || (user.role !== "host" && user.role !== "admin")) navigate("/signin");
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
+  if (authLoading) return null;
   if (!user || (user.role !== "host" && user.role !== "admin")) return null;
 
   async function handlePublish(eventData) {
     const payload = { ...eventData, host_id: user.id };
     if (editingEvent) {
-      console.log("[publish] updating event id:", editingEvent.id, "payload:", payload);
       updateEvent(editingEvent.id, eventData);
-      const result = await updateEventInDB(editingEvent.id, payload);
-      console.log("[publish] update result:", result);
+      await updateEventInDB(editingEvent.id, payload);
     } else {
-      console.log("[publish] creating event, payload:", payload);
+      const tempId = eventData.id;
       addCreatedEvent(eventData);
-      const result = await createEventInDB(payload);
-      console.log("[publish] create result:", result);
+      try {
+        const dbEvent = await createEventInDB(payload);
+        // Sync local state to real DB record (which has a DB-assigned UUID)
+        if (dbEvent && dbEvent.id !== tempId) {
+          replaceCreatedEvent(tempId, { ...eventData, ...dbEvent });
+        }
+      } catch (err) {
+        // Roll back optimistic event so a broken record doesn't linger
+        deleteEvent(tempId);
+        throw err;
+      }
     }
     setCreateEventOpen(false);
     setEditingEvent(null);
@@ -1882,14 +1919,19 @@ export default function HostTools() {
     setInitialTemplate(null);
   }
 
-  // Admin sees all DB events; host sees only their own
+  // Admin sees all DB events; host sees their own (optimistic + DB-persisted)
   const allHostEvents = useMemo(() => {
     if (user.role === "admin") return allDbEvents;
-    const staticHost = staticEvents.filter((e) => HOST_EVENT_IDS.includes(e.id));
-    const merged = [...createdEvents, ...staticHost];
-    const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
-    return filtered.map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e));
-  }, [user.role, allDbEvents, createdEvents, deletedEventIds, editedEvents]);
+    // Pull DB events owned by this host so they survive page refreshes
+    const ownedDbEvents = allDbEvents.filter((e) => e.host_id === user.id);
+    const merged = [...createdEvents, ...ownedDbEvents];
+    // Deduplicate — createdEvents (optimistic) take precedence over DB copies
+    const seen = new Set();
+    const deduped = merged.filter((e) => { if (seen.has(e.id)) return false; seen.add(e.id); return true; });
+    return deduped
+      .filter((e) => !deletedEventIds.has(e.id))
+      .map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e));
+  }, [user.role, allDbEvents, user.id, createdEvents, deletedEventIds, editedEvents]);
 
   // Full catalog (for the Bookmarked Events section)
   const allCatalogEvents = useMemo(() => {

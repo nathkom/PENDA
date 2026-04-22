@@ -13,7 +13,7 @@ export function useEvents() {
   // Re-attach BASE_URL to relative image paths stored in Supabase
   function normalizeImages(event) {
     function fixUrl(url) {
-      if (!url || url.startsWith("http") || url.startsWith(base)) return url;
+      if (!url || url.startsWith("http") || url.startsWith("data:") || url.startsWith(base)) return url;
       return base + url.replace(/^\//, "");
     }
     return {

@@ -20,7 +20,7 @@ export async function fetchEventById(id) {
 }
 
 const ALLOWED_EVENT_FIELDS = new Set([
-  "title", "space_name", "neighborhood", "category", "description",
+  "id", "title", "space_name", "neighborhood", "category", "description",
   "date", "time", "cost", "cost_amount", "accessibility", "tags",
   "image_url", "gallery_images", "contact_email", "featured",
   "noise_level", "accessibility_info", "space_format", "crowd_level",
@@ -52,10 +52,10 @@ export async function createEvent(eventObj) {
 }
 
 export async function updateEvent(id, patch) {
+  // upsert so edits work even if the event was never persisted (pre-fix stale data)
   const { data, error } = await supabase
     .from("events")
-    .update(sanitizeEvent(patch))
-    .eq("id", id)
+    .upsert({ ...sanitizeEvent(patch), id }, { onConflict: "id" })
     .select()
     .single();
   if (error) throw error;
@@ -111,6 +111,17 @@ export async function fetchEventAttendees(eventId) {
     .order("created_at");
   if (error) throw error;
   return data ?? [];
+}
+
+export async function uploadEventImage(file, eventId) {
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `${eventId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage
+    .from("event-images")
+    .upload(path, file, { upsert: true });
+  if (error) throw error;
+  const { data } = supabase.storage.from("event-images").getPublicUrl(path);
+  return data.publicUrl;
 }
 
 export async function trackAnalytic(eventId, action, userId = null) {

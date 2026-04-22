@@ -232,7 +232,7 @@ export default function NavBar() {
           {(user?.role === "host" || user?.role === "admin") && (
             <button
               onClick={() =>
-                navigate("/host", { state: { section: "events" } })
+                navigate("/host", { state: { section: "events", create: true } })
               }
               className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm font-semibold transition-colors"
               aria-label="Create a new event"
@@ -395,7 +395,7 @@ export default function NavBar() {
                     <button
                       onClick={() => {
                         setMenuOpen(false);
-                        navigate("/host", { state: { section: "events" } });
+                        navigate("/host", { state: { section: "events", create: true } });
                       }}
                       className="text-left bg-[#9FB366] text-white font-semibold px-5 py-2 rounded-full hover:bg-[#8a9c57] transition-colors"
                     >
