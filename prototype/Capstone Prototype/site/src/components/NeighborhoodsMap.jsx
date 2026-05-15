@@ -1,12 +1,13 @@
-import "mapbox-gl/dist/mapbox-gl.css"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import Map, { Layer, Popup, Source } from "react-map-gl/mapbox"
-import { Link } from "react-router-dom"
-import { SlidersHorizontal, X } from "lucide-react"
+import "mapbox-gl/dist/mapbox-gl.css";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Map, { Layer, Popup, Source } from "react-map-gl/mapbox";
+import { Link } from "react-router-dom";
+import { SlidersHorizontal, X } from "lucide-react";
+import filterBackImg from "../../wireframes/ffilterback.png";
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
-const SEATTLE_CENTER = { lng: -122.3321, lat: 47.6062 }
-const DEFAULT_ZOOM = 11
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+const SEATTLE_CENTER = { lng: -122.3321, lat: 47.6062 };
+const DEFAULT_ZOOM = 11;
 
 const CATEGORIES = [
   { value: "social", label: "Social" },
@@ -15,51 +16,56 @@ const CATEGORIES = [
   { value: "food", label: "Food" },
   { value: "sports", label: "Sports" },
   { value: "educational", label: "Educational" },
-]
+];
 
 // Approximate geographic centers for each neighborhood
 const NEIGHBORHOOD_CENTERS = {
-  "Capitol Hill":       { lat: 47.6253, lng: -122.3222 },
-  "Ballard":            { lat: 47.6681, lng: -122.3838 },
-  "Fremont":            { lat: 47.6512, lng: -122.3517 },
-  "Columbia City":      { lat: 47.5596, lng: -122.2916 },
-  "Rainier Valley":     { lat: 47.5502, lng: -122.2791 },
-  "University District":{ lat: 47.6597, lng: -122.3134 },
-  "West Seattle":       { lat: 47.5609, lng: -122.3867 },
-  "South Lake Union":   { lat: 47.6257, lng: -122.3364 },
-}
+  "Capitol Hill": { lat: 47.6253, lng: -122.3222 },
+  Ballard: { lat: 47.6681, lng: -122.3838 },
+  Fremont: { lat: 47.6512, lng: -122.3517 },
+  "Columbia City": { lat: 47.5596, lng: -122.2916 },
+  "Rainier Valley": { lat: 47.5502, lng: -122.2791 },
+  "University District": { lat: 47.6597, lng: -122.3134 },
+  "West Seattle": { lat: 47.5609, lng: -122.3867 },
+  "South Lake Union": { lat: 47.6257, lng: -122.3364 },
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // Deterministic integer hash of a string — used to spread event pins within a neighborhood
 function hashString(str) {
-  let h = 0
+  let h = 0;
   for (let i = 0; i < str.length; i++) {
-    h = (h << 5) - h + str.charCodeAt(i)
-    h |= 0
+    h = (h << 5) - h + str.charCodeAt(i);
+    h |= 0;
   }
-  return h
+  return h;
 }
 
 function getNeighborhoodBounds(geometry) {
-  let minLng = Infinity, minLat = Infinity
-  let maxLng = -Infinity, maxLat = -Infinity
+  let minLng = Infinity,
+    minLat = Infinity;
+  let maxLng = -Infinity,
+    maxLat = -Infinity;
 
   function processRing(ring) {
     ring.forEach(([lng, lat]) => {
-      if (lng < minLng) minLng = lng
-      if (lat < minLat) minLat = lat
-      if (lng > maxLng) maxLng = lng
-      if (lat > maxLat) maxLat = lat
-    })
+      if (lng < minLng) minLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lng > maxLng) maxLng = lng;
+      if (lat > maxLat) maxLat = lat;
+    });
   }
 
   if (geometry.type === "Polygon") {
-    geometry.coordinates.forEach(processRing)
+    geometry.coordinates.forEach(processRing);
   } else {
-    geometry.coordinates.forEach((polygon) => polygon.forEach(processRing))
+    geometry.coordinates.forEach((polygon) => polygon.forEach(processRing));
   }
-  return [[minLng, minLat], [maxLng, maxLat]]
+  return [
+    [minLng, minLat],
+    [maxLng, maxLat],
+  ];
 }
 
 // Build a GeoJSON FeatureCollection from events, placing each pin at an
@@ -69,12 +75,12 @@ function eventsToGeoJSON(events) {
     type: "FeatureCollection",
     features: events
       .map((event) => {
-        const center = NEIGHBORHOOD_CENTERS[event.neighborhood]
-        if (!center) return null
-        const h = hashString(event.id)
+        const center = NEIGHBORHOOD_CENTERS[event.neighborhood];
+        if (!center) return null;
+        const h = hashString(event.id);
         // Normalise to [-1, 1] then scale to ±0.003° lat / ±0.004° lng ≈ ±330 m
-        const lat = center.lat + (((h & 0xff) - 128) / 128) * 0.003
-        const lng = center.lng + ((((h >> 8) & 0xff) - 128) / 128) * 0.004
+        const lat = center.lat + (((h & 0xff) - 128) / 128) * 0.003;
+        const lng = center.lng + ((((h >> 8) & 0xff) - 128) / 128) * 0.004;
         return {
           type: "Feature",
           geometry: { type: "Point", coordinates: [lng, lat] },
@@ -86,10 +92,10 @@ function eventsToGeoJSON(events) {
             time: event.time,
             cost: event.cost,
           },
-        }
+        };
       })
       .filter(Boolean),
-  }
+  };
 }
 
 // ─── Filter panel ─────────────────────────────────────────────────────────────
@@ -102,40 +108,38 @@ function MapFilterPanel({
   onNeighborhoodSelect,
 }) {
   function update(partial) {
-    onChange({ ...filters, ...partial })
+    onChange({ ...filters, ...partial });
   }
 
   const activeCount =
     (filters.category ? 1 : 0) +
     (filters.cost !== "all" ? 1 : 0) +
-    (selectedNeighborhood ? 1 : 0)
+    (selectedNeighborhood ? 1 : 0);
 
-  const sortedCounts = Object.entries(eventCounts).sort((a, b) => b[1] - a[1])
+  const sortedCounts = Object.entries(eventCounts).sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal size={14} className="text-gray-400" />
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-            Filters
-          </h2>
+        <h2 className="font-semibold text-gray-900 text-sm uppercase tracking-wide">
+          Filters
           {activeCount > 0 && (
-            <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-100 px-1.5 text-xs font-medium text-gray-700">
+            <span className="ml-2 bg-[#9FB366] text-white text-xs font-bold px-2 py-0.5 rounded-full">
               {activeCount}
             </span>
           )}
-        </div>
+        </h2>
         {activeCount > 0 && (
           <button
             onClick={() => {
-              onChange({ category: "", cost: "all" })
-              if (selectedNeighborhood) onNeighborhoodSelect(selectedNeighborhood)
+              onChange({ category: "", cost: "all" });
+              if (selectedNeighborhood)
+                onNeighborhoodSelect(selectedNeighborhood);
             }}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors"
           >
-            <X size={10} />
+            <X size={12} />
             Clear all
           </button>
         )}
@@ -143,7 +147,9 @@ function MapFilterPanel({
 
       {/* Category chips */}
       <div className="space-y-2">
-        <p className="text-xs font-medium text-gray-700">Category</p>
+        <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+          Category
+        </p>
         <div className="flex flex-wrap gap-1.5">
           {CATEGORIES.map(({ value, label }) => (
             <button
@@ -165,7 +171,9 @@ function MapFilterPanel({
 
       {/* Cost */}
       <div className="space-y-2">
-        <p className="text-xs font-medium text-gray-700">Cost</p>
+        <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+          Cost
+        </p>
         <div className="flex gap-1.5">
           {[
             { value: "all", label: "All" },
@@ -190,17 +198,19 @@ function MapFilterPanel({
       {/* Neighborhoods — clickable, bidirectional with map */}
       {sortedCounts.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-gray-700">Neighborhood</p>
+          <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+            Neighborhood
+          </p>
           <ul className="space-y-0.5">
             {sortedCounts.map(([name, count]) => {
-              const isSelected = selectedNeighborhood === name
+              const isSelected = selectedNeighborhood === name;
               return (
                 <li key={name}>
                   <button
                     onClick={() => onNeighborhoodSelect(name)}
                     className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
                       isSelected
-                        ? "bg-[#00A6CB]/10 font-semibold text-[#00A6CB]"
+                        ? "bg-[#9FB366]/10 font-semibold text-[#9FB366]"
                         : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                     }`}
                   >
@@ -208,7 +218,7 @@ function MapFilterPanel({
                     <span
                       className={`ml-2 shrink-0 rounded-full px-2 py-0.5 font-medium ${
                         isSelected
-                          ? "bg-[#00A6CB]/15 text-[#00A6CB]"
+                          ? "bg-[#9FB366]/15 text-[#9FB366]"
                           : "bg-green-50 text-green-700"
                       }`}
                     >
@@ -216,7 +226,7 @@ function MapFilterPanel({
                     </span>
                   </button>
                 </li>
-              )
+              );
             })}
           </ul>
         </div>
@@ -224,13 +234,18 @@ function MapFilterPanel({
 
       {/* Legend */}
       <div className="space-y-1.5 border-t pt-3">
-        <p className="text-xs font-medium text-gray-700">Legend</p>
+        <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+          Legend
+        </p>
         <div className="flex items-center gap-2 text-xs text-gray-500">
           <span className="inline-block h-3 w-3 rounded-sm bg-green-400 opacity-70" />
           Has matching events
         </div>
         <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: "#00A6CB", opacity: 0.8 }} />
+          <span
+            className="inline-block h-3 w-3 rounded-sm"
+            style={{ backgroundColor: "#00A6CB", opacity: 0.8 }}
+          />
           Selected neighborhood
         </div>
         <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -239,7 +254,7 @@ function MapFilterPanel({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Main map component ───────────────────────────────────────────────────────
@@ -250,51 +265,55 @@ export default function NeighborhoodsMap({
   onNeighborhoodClick,
   height = 392,
 }) {
-  const mapRef = useRef(null)
-  const [mapHeight, setMapHeight] = useState(height)
+  const mapRef = useRef(null);
+  const [mapHeight, setMapHeight] = useState(height);
 
   // ── Resize handle ─────────────────────────────────────────────────────────
-  const resizeStartY = useRef(0)
-  const resizeStartH = useRef(0)
+  const resizeStartY = useRef(0);
+  const resizeStartH = useRef(0);
 
   function onResizeMouseDown(e) {
-    resizeStartY.current = e.clientY
-    resizeStartH.current = mapHeight
+    resizeStartY.current = e.clientY;
+    resizeStartH.current = mapHeight;
 
     function onMouseMove(ev) {
-      const delta = ev.clientY - resizeStartY.current
-      setMapHeight(Math.max(200, resizeStartH.current + delta))
+      const delta = ev.clientY - resizeStartY.current;
+      setMapHeight(Math.max(200, resizeStartH.current + delta));
     }
 
     function onMouseUp() {
-      document.removeEventListener("mousemove", onMouseMove)
-      document.removeEventListener("mouseup", onMouseUp)
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
     }
 
-    document.addEventListener("mousemove", onMouseMove)
-    document.addEventListener("mouseup", onMouseUp)
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   }
   const [viewState, setViewState] = useState({
     longitude: SEATTLE_CENTER.lng,
     latitude: SEATTLE_CENTER.lat,
     zoom: DEFAULT_ZOOM,
-  })
-  const [popupInfo, setPopupInfo] = useState(null)
-  const [hoveredNeighborhoodId, setHoveredNeighborhoodId] = useState(null)
-  const [cursor, setCursor] = useState("grab")
-  const [neighborhoodGeometries, setNeighborhoodGeometries] = useState({})
+  });
+  const [popupInfo, setPopupInfo] = useState(null);
+  const [hoveredNeighborhoodId, setHoveredNeighborhoodId] = useState(null);
+  const [cursor, setCursor] = useState("grab");
+  const [neighborhoodGeometries, setNeighborhoodGeometries] = useState({});
 
   // Always-current view state for snapshot-before-zoom
-  const viewStateRef = useRef({ longitude: SEATTLE_CENTER.lng, latitude: SEATTLE_CENTER.lat, zoom: DEFAULT_ZOOM })
+  const viewStateRef = useRef({
+    longitude: SEATTLE_CENTER.lng,
+    latitude: SEATTLE_CENTER.lat,
+    zoom: DEFAULT_ZOOM,
+  });
   // Saved view state to restore when deselecting a neighborhood
-  const savedViewStateRef = useRef(null)
+  const savedViewStateRef = useRef(null);
   // Name of the neighborhood last selected via a map click (so effect doesn't double-zoom)
-  const lastMapClickedNeighborhood = useRef("")
+  const lastMapClickedNeighborhood = useRef("");
   // True when a map click triggered a deselect (so effect skips the zoom-out)
-  const mapDeselectedRef = useRef(false)
+  const mapDeselectedRef = useRef(false);
 
-  const [filters, setFilters] = useState({ category: "", cost: "all" })
-  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [filters, setFilters] = useState({ category: "", cost: "all" });
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // ── GeoJSON fetch ────────────────────────────────────────────────────────
 
@@ -302,20 +321,21 @@ export default function NeighborhoodsMap({
     fetch(`${import.meta.env.BASE_URL}seattle-neighborhoods.geojson`)
       .then((r) => r.json())
       .then((data) => {
-        const geometries = {}
+        const geometries = {};
         data.features.forEach((f) => {
-          const name = f.properties?.name
+          const name = f.properties?.name;
           if (
             name &&
-            (f.geometry.type === "Polygon" || f.geometry.type === "MultiPolygon")
+            (f.geometry.type === "Polygon" ||
+              f.geometry.type === "MultiPolygon")
           ) {
-            geometries[name] = f.geometry
+            geometries[name] = f.geometry;
           }
-        })
-        setNeighborhoodGeometries(geometries)
+        });
+        setNeighborhoodGeometries(geometries);
       })
-      .catch(() => {})
-  }, [])
+      .catch(() => {});
+  }, []);
 
   // ── Zoom effect for externally-triggered (sidebar) selection changes ──────
 
@@ -324,84 +344,90 @@ export default function NeighborhoodsMap({
       // selectedNeighborhood became empty
       if (mapDeselectedRef.current) {
         // Map click already zoomed out — just clear the flag
-        mapDeselectedRef.current = false
-        return
+        mapDeselectedRef.current = false;
+        return;
       }
       // Sidebar-triggered deselect — zoom back out
       if (savedViewStateRef.current && mapRef.current) {
         mapRef.current.flyTo({
-          center: [savedViewStateRef.current.longitude, savedViewStateRef.current.latitude],
+          center: [
+            savedViewStateRef.current.longitude,
+            savedViewStateRef.current.latitude,
+          ],
           zoom: savedViewStateRef.current.zoom,
           duration: 800,
-        })
-        savedViewStateRef.current = null
+        });
+        savedViewStateRef.current = null;
       }
-      return
+      return;
     }
 
     if (selectedNeighborhood === lastMapClickedNeighborhood.current) {
       // Map click already zoomed in — skip
-      lastMapClickedNeighborhood.current = ""
-      return
+      lastMapClickedNeighborhood.current = "";
+      return;
     }
 
     // Sidebar-triggered selection — save view and zoom in
     if (!savedViewStateRef.current) {
-      savedViewStateRef.current = { ...viewStateRef.current }
+      savedViewStateRef.current = { ...viewStateRef.current };
     }
-    const geometry = neighborhoodGeometries[selectedNeighborhood]
-    if (!geometry || !mapRef.current) return
-    const bounds = getNeighborhoodBounds(geometry)
-    mapRef.current.fitBounds(bounds, { padding: 48, duration: 800 })
-  }, [selectedNeighborhood, neighborhoodGeometries])
+    const geometry = neighborhoodGeometries[selectedNeighborhood];
+    if (!geometry || !mapRef.current) return;
+    const bounds = getNeighborhoodBounds(geometry);
+    mapRef.current.fitBounds(bounds, { padding: 48, duration: 800 });
+  }, [selectedNeighborhood, neighborhoodGeometries]);
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
-      if (filters.category && event.category !== filters.category) return false
-      if (filters.cost === "free" && event.cost !== "free") return false
-      if (filters.cost === "paid" && event.cost === "free") return false
-      return true
-    })
-  }, [events, filters])
+      if (filters.category && event.category !== filters.category) return false;
+      if (filters.cost === "free" && event.cost !== "free") return false;
+      if (filters.cost === "paid" && event.cost === "free") return false;
+      return true;
+    });
+  }, [events, filters]);
 
   const activeNeighborhoods = useMemo(
     () => [...new Set(filteredEvents.map((e) => e.neighborhood))],
     [filteredEvents],
-  )
+  );
 
   const eventCounts = useMemo(() => {
-    const counts = {}
+    const counts = {};
     filteredEvents.forEach((e) => {
-      counts[e.neighborhood] = (counts[e.neighborhood] || 0) + 1
-    })
-    return counts
-  }, [filteredEvents])
+      counts[e.neighborhood] = (counts[e.neighborhood] || 0) + 1;
+    });
+    return counts;
+  }, [filteredEvents]);
 
   // Events outside the selected neighborhood — shown clustered
   const otherEventsGeoJSON = useMemo(() => {
     const subset = selectedNeighborhood
       ? filteredEvents.filter((e) => e.neighborhood !== selectedNeighborhood)
-      : filteredEvents
-    return eventsToGeoJSON(subset)
-  }, [filteredEvents, selectedNeighborhood])
+      : filteredEvents;
+    return eventsToGeoJSON(subset);
+  }, [filteredEvents, selectedNeighborhood]);
 
   // Selected neighborhood events — shown unclustered so individual pins are visible
   const selectedEventsGeoJSON = useMemo(() => {
-    if (!selectedNeighborhood) return { type: "FeatureCollection", features: [] }
-    return eventsToGeoJSON(filteredEvents.filter((e) => e.neighborhood === selectedNeighborhood))
-  }, [filteredEvents, selectedNeighborhood])
+    if (!selectedNeighborhood)
+      return { type: "FeatureCollection", features: [] };
+    return eventsToGeoJSON(
+      filteredEvents.filter((e) => e.neighborhood === selectedNeighborhood),
+    );
+  }, [filteredEvents, selectedNeighborhood]);
 
   // Helper: compute a pin's map coordinates from an event (mirrors eventsToGeoJSON)
   function getEventCoords(event) {
-    const center = NEIGHBORHOOD_CENTERS[event.neighborhood]
-    if (!center) return null
-    const h = hashString(event.id)
+    const center = NEIGHBORHOOD_CENTERS[event.neighborhood];
+    if (!center) return null;
+    const h = hashString(event.id);
     return {
       lng: center.lng + ((((h >> 8) & 0xff) - 128) / 128) * 0.004,
       lat: center.lat + (((h & 0xff) - 128) / 128) * 0.003,
-    }
+    };
   }
 
   // ── Mapbox paint expressions ──────────────────────────────────────────────
@@ -410,133 +436,145 @@ export default function NeighborhoodsMap({
     if (activeNeighborhoods.length === 0) {
       return [
         "case",
-        ["==", ["get", "name"], selectedNeighborhood || ""], "#00A6CB",
+        ["==", ["get", "name"], selectedNeighborhood || ""],
+        "#00A6CB",
         "#94a3b8",
-      ]
+      ];
     }
     return [
       "case",
-      ["==", ["get", "name"], selectedNeighborhood || ""], "#00A6CB",
+      ["==", ["get", "name"], selectedNeighborhood || ""],
+      "#00A6CB",
       ["match", ["get", "name"], activeNeighborhoods, "#4ade80", "#94a3b8"],
-    ]
-  }, [selectedNeighborhood, activeNeighborhoods])
+    ];
+  }, [selectedNeighborhood, activeNeighborhoods]);
 
   const fillOpacity = useMemo(() => {
     if (activeNeighborhoods.length === 0) {
       return [
         "case",
-        ["boolean", ["feature-state", "hover"], false], 0.35,
-        ["==", ["get", "name"], selectedNeighborhood || ""], 0.3,
+        ["boolean", ["feature-state", "hover"], false],
+        0.35,
+        ["==", ["get", "name"], selectedNeighborhood || ""],
+        0.3,
         0.06,
-      ]
+      ];
     }
     return [
       "case",
-      ["boolean", ["feature-state", "hover"], false], 0.35,
-      ["==", ["get", "name"], selectedNeighborhood || ""], 0.3,
+      ["boolean", ["feature-state", "hover"], false],
+      0.35,
+      ["==", ["get", "name"], selectedNeighborhood || ""],
+      0.3,
       ["match", ["get", "name"], activeNeighborhoods, 0.22, 0.06],
-    ]
-  }, [selectedNeighborhood, activeNeighborhoods])
+    ];
+  }, [selectedNeighborhood, activeNeighborhoods]);
 
   const borderColor = [
     "case",
-    ["==", ["get", "name"], selectedNeighborhood || ""], "#00A6CB",
+    ["==", ["get", "name"], selectedNeighborhood || ""],
+    "#00A6CB",
     "#64748b",
-  ]
+  ];
   const borderWidth = [
     "case",
-    ["==", ["get", "name"], selectedNeighborhood || ""], 2.5,
+    ["==", ["get", "name"], selectedNeighborhood || ""],
+    2.5,
     0.8,
-  ]
+  ];
   const borderOpacity = [
     "case",
-    ["boolean", ["feature-state", "hover"], false], 1,
-    ["==", ["get", "name"], selectedNeighborhood || ""], 1,
+    ["boolean", ["feature-state", "hover"], false],
+    1,
+    ["==", ["get", "name"], selectedNeighborhood || ""],
+    1,
     0.4,
-  ]
+  ];
 
   // ── Hover ─────────────────────────────────────────────────────────────────
 
   const onMouseMove = useCallback(
     (evt) => {
-      const features = evt.features
+      const features = evt.features;
 
       // Pointer cursor for event pins
       const hasEventPin = features?.some((f) =>
         ["event-clusters", "event-unclustered"].includes(f.layer?.id ?? ""),
-      )
+      );
 
-      const nf = features?.find((f) => f.layer?.id === "neighborhoods-fill")
+      const nf = features?.find((f) => f.layer?.id === "neighborhoods-fill");
       if (nf) {
-        const id = nf.id
+        const id = nf.id;
         if (id !== hoveredNeighborhoodId) {
           if (hoveredNeighborhoodId !== null) {
             mapRef.current?.setFeatureState(
               { source: "neighborhoods", id: hoveredNeighborhoodId },
               { hover: false },
-            )
+            );
           }
           if (id !== undefined) {
             mapRef.current?.setFeatureState(
               { source: "neighborhoods", id },
               { hover: true },
-            )
+            );
           }
-          setHoveredNeighborhoodId(id ?? null)
+          setHoveredNeighborhoodId(id ?? null);
         }
-        setCursor("pointer")
+        setCursor("pointer");
       } else {
         if (hoveredNeighborhoodId !== null) {
           mapRef.current?.setFeatureState(
             { source: "neighborhoods", id: hoveredNeighborhoodId },
             { hover: false },
-          )
-          setHoveredNeighborhoodId(null)
+          );
+          setHoveredNeighborhoodId(null);
         }
-        setCursor(hasEventPin ? "pointer" : "grab")
+        setCursor(hasEventPin ? "pointer" : "grab");
       }
     },
     [hoveredNeighborhoodId],
-  )
+  );
 
   const onMouseLeave = useCallback(() => {
     if (hoveredNeighborhoodId !== null) {
       mapRef.current?.setFeatureState(
         { source: "neighborhoods", id: hoveredNeighborhoodId },
         { hover: false },
-      )
-      setHoveredNeighborhoodId(null)
+      );
+      setHoveredNeighborhoodId(null);
     }
-    setCursor("grab")
-  }, [hoveredNeighborhoodId])
+    setCursor("grab");
+  }, [hoveredNeighborhoodId]);
 
   // ── Click ─────────────────────────────────────────────────────────────────
 
   const onClick = useCallback(
     (evt) => {
-      const features = evt.features
+      const features = evt.features;
 
       // Priority 1: event cluster → zoom in
       const clusterFeature = features?.find(
         (f) => f.layer?.id === "event-clusters" && f.properties?.cluster,
-      )
+      );
       if (clusterFeature) {
-        const coords = clusterFeature.geometry.coordinates
+        const coords = clusterFeature.geometry.coordinates;
         mapRef.current?.flyTo({
           center: [coords[0], coords[1]],
           zoom: viewStateRef.current.zoom + 2,
           duration: 500,
-        })
-        return
+        });
+        return;
       }
 
       // Priority 2: individual event pin → popup
       const eventFeature = features?.find(
-        (f) => f.layer?.id === "event-unclustered" || f.layer?.id === "event-selected-pin",
-      )
+        (f) =>
+          f.layer?.id === "event-unclustered" ||
+          f.layer?.id === "event-selected-pin",
+      );
       if (eventFeature) {
-        const props = eventFeature.properties
-        const coords = eventFeature.geometry.coordinates
+        const props = eventFeature.properties;
+        const coords = eventFeature.geometry.coordinates;
         setPopupInfo({
           kind: "event",
           id: props.id,
@@ -546,66 +584,71 @@ export default function NeighborhoodsMap({
           time: props.time,
           longitude: coords[0],
           latitude: coords[1],
-        })
-        return
+        });
+        return;
       }
 
       // Priority 3: neighborhood boundary
-      const nf = features?.find((f) => f.layer?.id === "neighborhoods-fill")
+      const nf = features?.find((f) => f.layer?.id === "neighborhoods-fill");
       if (!nf) {
-        setPopupInfo(null)
-        return
+        setPopupInfo(null);
+        return;
       }
 
-      const name = nf.properties?.name
-      if (!name) return
+      const name = nf.properties?.name;
+      if (!name) return;
 
       if (selectedNeighborhood === name) {
         // Deselecting: zoom back out to saved view
-        mapDeselectedRef.current = true
+        mapDeselectedRef.current = true;
         if (savedViewStateRef.current && mapRef.current) {
           mapRef.current.flyTo({
-            center: [savedViewStateRef.current.longitude, savedViewStateRef.current.latitude],
+            center: [
+              savedViewStateRef.current.longitude,
+              savedViewStateRef.current.latitude,
+            ],
             zoom: savedViewStateRef.current.zoom,
             duration: 800,
-          })
-          savedViewStateRef.current = null
+          });
+          savedViewStateRef.current = null;
         }
-        onNeighborhoodClick?.(name) // toggles parent state to ""
-        setPopupInfo(null)
-        return
+        onNeighborhoodClick?.(name); // toggles parent state to ""
+        setPopupInfo(null);
+        return;
       }
 
       // Selecting: save current view state, zoom in
       if (!savedViewStateRef.current) {
-        savedViewStateRef.current = { ...viewStateRef.current }
+        savedViewStateRef.current = { ...viewStateRef.current };
       }
-      const geom = nf.geometry
+      const geom = nf.geometry;
       if (geom.type === "Polygon" || geom.type === "MultiPolygon") {
         mapRef.current?.fitBounds(getNeighborhoodBounds(geom), {
           padding: 48,
           duration: 800,
-        })
+        });
       }
-      lastMapClickedNeighborhood.current = name
-      onNeighborhoodClick?.(name)
-      const nhCenter = NEIGHBORHOOD_CENTERS[name]
+      lastMapClickedNeighborhood.current = name;
+      onNeighborhoodClick?.(name);
+      const nhCenter = NEIGHBORHOOD_CENTERS[name];
       setPopupInfo({
         kind: "neighborhood",
         name,
         longitude: nhCenter?.lng ?? evt.lngLat.lng,
         latitude: nhCenter?.lat ?? evt.lngLat.lat,
-        neighborhoodEvents: filteredEvents.filter((e) => e.neighborhood === name),
-      })
+        neighborhoodEvents: filteredEvents.filter(
+          (e) => e.neighborhood === name,
+        ),
+      });
     },
     [selectedNeighborhood, onNeighborhoodClick, eventCounts, filteredEvents],
-  )
+  );
 
   // ── Sidebar neighborhood toggle (bidirectional with map) ──────────────────
 
   function handleNeighborhoodSelect(name) {
-    onNeighborhoodClick?.(name) // parent toggles mapSelectedNeighborhood
-    setPopupInfo(null)
+    onNeighborhoodClick?.(name); // parent toggles mapSelectedNeighborhood
+    setPopupInfo(null);
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -618,7 +661,7 @@ export default function NeighborhoodsMap({
       selectedNeighborhood={selectedNeighborhood}
       onNeighborhoodSelect={handleNeighborhoodSelect}
     />
-  )
+  );
 
   return (
     <div className="rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -643,8 +686,17 @@ export default function NeighborhoodsMap({
       {/* Map + desktop sidebar */}
       <div className="flex" style={{ height: mapHeight }}>
         {/* Desktop sidebar */}
-        <aside className="hidden w-56 shrink-0 overflow-y-auto border-r bg-white p-4 md:block">
-          {filterPanel}
+        <aside
+          className="hidden w-64 shrink-0 overflow-y-auto border-r md:block"
+          style={{
+            backgroundImage: `url(${filterBackImg})`,
+            backgroundSize: "120%",
+            backgroundPosition: "top center",
+          }}
+        >
+          <div className="bg-[#F5F0E8] border border-gray-200 rounded-xl mx-3 mt-3 mb-4 p-4 min-h-full">
+            {filterPanel}
+          </div>
         </aside>
 
         {/* Map */}
@@ -653,8 +705,8 @@ export default function NeighborhoodsMap({
             ref={mapRef}
             {...viewState}
             onMove={(evt) => {
-              setViewState(evt.viewState)
-              viewStateRef.current = evt.viewState
+              setViewState(evt.viewState);
+              viewStateRef.current = evt.viewState;
             }}
             mapStyle="mapbox://styles/mapbox/streets-v12"
             mapboxAccessToken={MAPBOX_TOKEN}
@@ -708,12 +760,22 @@ export default function NeighborhoodsMap({
                 filter={["has", "point_count"]}
                 paint={{
                   "circle-color": [
-                    "step", ["get", "point_count"],
-                    "#f59e0b", 10, "#d97706", 25, "#b45309",
+                    "step",
+                    ["get", "point_count"],
+                    "#f59e0b",
+                    10,
+                    "#d97706",
+                    25,
+                    "#b45309",
                   ],
                   "circle-radius": [
-                    "step", ["get", "point_count"],
-                    20, 10, 28, 25, 36,
+                    "step",
+                    ["get", "point_count"],
+                    20,
+                    10,
+                    28,
+                    25,
+                    36,
                   ],
                   "circle-opacity": 0.9,
                 }}
@@ -743,7 +805,11 @@ export default function NeighborhoodsMap({
             </Source>
 
             {/* ── Event pins — unclustered (selected neighborhood only) ──── */}
-            <Source id="events-selected" type="geojson" data={selectedEventsGeoJSON}>
+            <Source
+              id="events-selected"
+              type="geojson"
+              data={selectedEventsGeoJSON}
+            >
               <Layer
                 id="event-selected-pin"
                 type="circle"
@@ -784,27 +850,34 @@ export default function NeighborhoodsMap({
               >
                 {popupInfo.kind === "neighborhood" ? (
                   <div className="w-[220px] p-2">
-                    <p className="text-sm font-semibold text-gray-900">{popupInfo.name}</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {popupInfo.name}
+                    </p>
                     {popupInfo.neighborhoodEvents.length === 0 ? (
-                      <p className="mt-1 text-xs text-gray-400">No events match current filters</p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        No events match current filters
+                      </p>
                     ) : (
                       <>
                         <p className="mt-0.5 mb-1.5 text-xs text-gray-400">
                           {popupInfo.neighborhoodEvents.length} event
-                          {popupInfo.neighborhoodEvents.length !== 1 ? "s" : ""} here
+                          {popupInfo.neighborhoodEvents.length !== 1
+                            ? "s"
+                            : ""}{" "}
+                          here
                         </p>
                         <ul className="max-h-[160px] overflow-y-auto space-y-0.5">
                           {popupInfo.neighborhoodEvents.map((ev) => (
                             <li key={ev.id}>
                               <button
                                 onClick={() => {
-                                  const coords = getEventCoords(ev)
-                                  if (!coords || !mapRef.current) return
+                                  const coords = getEventCoords(ev);
+                                  if (!coords || !mapRef.current) return;
                                   mapRef.current.flyTo({
                                     center: [coords.lng, coords.lat],
                                     zoom: 15,
                                     duration: 600,
-                                  })
+                                  });
                                   setPopupInfo({
                                     kind: "event",
                                     id: ev.id,
@@ -814,12 +887,14 @@ export default function NeighborhoodsMap({
                                     time: ev.time,
                                     longitude: coords.lng,
                                     latitude: coords.lat,
-                                  })
+                                  });
                                 }}
                                 className="flex w-full items-start gap-1.5 rounded px-1.5 py-1 text-left hover:bg-amber-50 transition-colors"
                               >
                                 <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-amber-400" />
-                                <span className="text-xs text-gray-700 leading-snug">{ev.title}</span>
+                                <span className="text-xs text-gray-700 leading-snug">
+                                  {ev.title}
+                                </span>
                               </button>
                             </li>
                           ))}
@@ -831,11 +906,19 @@ export default function NeighborhoodsMap({
                   <div className="min-w-[160px] p-1.5">
                     <div className="mb-1 flex items-center gap-1.5">
                       <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
-                      <span className="text-xs font-medium text-gray-400">Event</span>
+                      <span className="text-xs font-medium text-gray-400">
+                        Event
+                      </span>
                     </div>
-                    <p className="text-sm font-semibold text-gray-900">{popupInfo.title}</p>
-                    <p className="mt-0.5 text-xs text-gray-500">{popupInfo.spaceName}</p>
-                    <p className="mt-0.5 text-xs text-gray-400">{popupInfo.date} · {popupInfo.time}</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {popupInfo.title}
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {popupInfo.spaceName}
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-400">
+                      {popupInfo.date} · {popupInfo.time}
+                    </p>
                     <Link
                       to={`/events/${popupInfo.id}`}
                       className="mt-2 inline-block text-xs text-amber-600 hover:underline"
@@ -859,5 +942,5 @@ export default function NeighborhoodsMap({
         <div className="h-1 w-10 rounded-full bg-gray-300" />
       </div>
     </div>
-  )
+  );
 }

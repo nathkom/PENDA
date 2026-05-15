@@ -24,6 +24,14 @@ export const neighborhoods = [
     event_ids: ["evt-007", "evt-008", "evt-009", "evt-029", "evt-030", "evt-031", "evt-032"]
   },
   {
+    id: "belltown",
+    name: "Belltown",
+    descriptor: "Urban energy & creative edge",
+    description: "One of Seattle's most walkable and densely packed neighborhoods, Belltown blends urban nightlife, independent galleries, and community spaces with easy access to the waterfront and Pike Place Market.",
+    image_url: "https://picsum.photos/seed/belltown/600/300",
+    event_ids: []
+  },
+  {
     id: "columbia-city",
     name: "Columbia City",
     descriptor: "Diverse, historic & growing",

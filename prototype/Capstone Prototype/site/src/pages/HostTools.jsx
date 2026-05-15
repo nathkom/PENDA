@@ -421,9 +421,13 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
     <div className="flex flex-col bg-stone-100" style={{ height: "calc(100vh - 64px)" }}>
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Left: Templates panel ── */}
-        {templatesOpen && (
-          <div className="w-[460px] bg-white border-r border-gray-200 flex-shrink-0 flex flex-col">
+        {/* ── Left: Templates panel — animates open/closed via width transition ── */}
+        <div
+          className="bg-white border-r border-gray-200 flex-shrink-0 flex flex-col overflow-hidden"
+          style={{ width: templatesOpen ? 460 : 0, transition: "width 300ms ease-in-out" }}
+        >
+          {/* Inner wrapper stays 460px so content never reflows during animation */}
+          <div className="w-[460px] flex flex-col h-full">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <h2 className="font-bold text-gray-900 text-base flex items-center gap-2">
                 <span>🗒️</span> Templates
@@ -431,6 +435,7 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
               <button
                 onClick={() => setTemplatesOpen(false)}
                 className="text-gray-400 hover:text-gray-700 transition-colors"
+                aria-label="Close templates"
               >
                 <X size={18} />
               </button>
@@ -492,22 +497,23 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
                 </div>
               )}
             </div>
-          </div>
-        )}
+          </div>{/* end inner 460px wrapper */}
+        </div>{/* end animated panel */}
 
         {/* ── Right: Form panel ── */}
         <div className="flex-1 overflow-y-auto bg-stone-100 px-6 py-6">
-          {!templatesOpen && (
+          {/* Persistent toggle — always visible */}
+          <div className="max-w-4xl mx-auto mb-4">
             <button
-              onClick={() => setTemplatesOpen(true)}
-              className="mb-4 flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+              onClick={() => setTemplatesOpen((o) => !o)}
+              className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
             >
               <FileText size={14} />
-              Show Templates
+              {templatesOpen ? "Hide Templates" : "Show Templates"}
             </button>
-          )}
+          </div>
 
-          <div className="max-w-2xl mx-auto flex flex-col gap-4">
+          <div className="max-w-4xl mx-auto flex flex-col gap-4">
 
             {/* Edit mode banner */}
             {isEditing && (

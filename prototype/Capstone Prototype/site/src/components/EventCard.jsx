@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { MapPin, Calendar, Clock, Bookmark, CalendarPlus, Share2, Check, Download } from "lucide-react";
+import thumbtackImg from "../../wireframes/thumbtack.png";
 
 const COST_BADGE = {
   free: "bg-green-100 text-green-700",
@@ -160,11 +161,12 @@ function CalendarDropdown({ event, calRef, calOpen, setCalOpen }) {
   return (
     <div ref={calRef} className="relative">
       <button
+        type="button"
         onClick={(e) => { e.preventDefault(); setCalOpen((o) => !o); }}
-        className={`p-2.5 rounded-lg border transition-colors ${
+        className={`p-2.5 flex items-center justify-center rounded-lg border transition-colors ${
           calOpen
             ? "border-[#9FB366] text-[#9FB366] bg-green-50"
-            : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500"
+            : "border-gray-400 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-600"
         }`}
         aria-label="Add to calendar"
       >
@@ -217,94 +219,211 @@ function FeedCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
 
   return (
     <>
-    <Link
-      to={`/events/${event.id}`}
-      className="block bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow group h-[220px]"
-      aria-label={`View details for ${event.title}`}
-    >
-      <div className="flex h-full">
+    <div className="relative">
+      <Link
+        to={`/events/${event.id}`}
+        className="block bg-[#F5F0E8] rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow group h-[220px]"
+        aria-label={`View details for ${event.title}`}
+      >
+        <div className="flex h-full">
+          {/* Image */}
+          <div className="w-52 shrink-0 overflow-hidden">
+            <img
+              src={event.image_url}
+              alt={event.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              loading="lazy"
+            />
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 p-4 flex flex-col min-w-0 overflow-hidden gap-1.5">
+
+            {/* Title */}
+            <h3 className="text-lg font-bold text-gray-900 leading-tight line-clamp-1 group-hover:text-[#9FB366] transition-colors">
+              {event.title}
+            </h3>
+
+            {/* Meta — single row */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+              {event.date && (
+                <span className="flex items-center gap-1">
+                  <Calendar size={11} className="text-[#97BFFF] shrink-0" />
+                  {formatDate(event.date)}
+                </span>
+              )}
+              {event.time && (
+                <span className="flex items-center gap-1">
+                  <Clock size={11} className="text-[#FFA86C] shrink-0" />
+                  {event.time}
+                </span>
+              )}
+              {event.space_name && (
+                <span className="flex items-center gap-1 truncate">
+                  <MapPin size={11} className="text-[#FD858A] shrink-0" />
+                  <span className="truncate">{event.space_name}, Seattle</span>
+                </span>
+              )}
+            </div>
+
+            {/* Description */}
+            {event.description && (
+              <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
+                {event.description}
+              </p>
+            )}
+
+            {/* Tags + action buttons — pushed to bottom */}
+            <div className="flex items-center justify-between mt-auto gap-2">
+              <div className="flex flex-wrap gap-1 min-w-0 overflow-hidden">
+                <span className={`text-sm px-3 py-1 rounded-full font-semibold ${costClass}`}>
+                  {costLabel}
+                </span>
+                {event.tags?.slice(0, 2).map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-sm px-3 py-1 rounded-full border border-green-300 text-green-700 capitalize whitespace-nowrap"
+                  >
+                    {tag.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+
+              {/* Action buttons — like inline with the rest */}
+              <div className="flex gap-1 shrink-0" onClick={(e) => e.preventDefault()}>
+                <button
+                  onClick={(e) => { e.preventDefault(); onToggleLike?.(event.id); }}
+                  className={`p-2.5 rounded-lg border transition-colors flex items-center gap-1 ${
+                    liked
+                      ? "border-red-300 text-red-500 bg-red-50"
+                      : "border-gray-400 hover:border-red-400 hover:text-red-500 text-gray-600"
+                  }`}
+                  aria-label={liked ? "Unlike event" : "Like event"}
+                >
+                  ❤️ <span className="text-xs">{likeCount ?? 0}</span>
+                </button>
+
+                <button
+                  onClick={() => onToggleBookmark?.(event.id)}
+                  className={`p-2.5 rounded-lg border transition-colors ${
+                    bookmarked
+                      ? "border-[#9FB366] text-[#9FB366] bg-green-50"
+                      : "border-gray-400 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-600"
+                  }`}
+                  aria-label={bookmarked ? "Remove bookmark" : "Bookmark event"}
+                >
+                  <Bookmark size={16} />
+                </button>
+
+                <CalendarDropdown event={event} calRef={calRef} calOpen={calOpen} setCalOpen={setCalOpen} />
+
+                <button
+                  onClick={handleShare}
+                  className={`p-2.5 rounded-lg border transition-colors ${
+                    copied
+                      ? "border-[#9FB366] text-[#9FB366] bg-green-50"
+                      : "border-gray-400 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-600"
+                  }`}
+                  aria-label={copied ? "Link copied!" : "Share event"}
+                >
+                  {copied ? <Check size={16} /> : <Share2 size={16} />}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Link>
+      {/* Thumbtack decoration */}
+      <img
+        src={thumbtackImg}
+        alt=""
+        aria-hidden="true"
+        className="absolute -top-6 -right-3 w-[80px] pointer-events-none select-none z-10 rotate-12"
+      />
+    </div>
+    <CopiedToast visible={copied} />
+  </>
+  );
+}
+
+// ── Grid card (vertical) — used on Events page ────────────────────────────────
+function GridCard({ event, costClass, costLabel, liked, likeCount, onToggleLike, bookmarked, onToggleBookmark }) {
+  const { calOpen, setCalOpen, calRef, copied, handleShare } = useEventActions(event);
+
+  return (
+    <>
+    <div className="relative">
+      <Link
+        to={`/events/${event.id}`}
+        className="group flex flex-col bg-[#F5F0E8] rounded-2xl border border-gray-200 hover:border-green-300 hover:shadow-lg transition-all overflow-hidden"
+        aria-label={`View details for ${event.title}`}
+      >
         {/* Image */}
-        <div className="w-52 shrink-0 overflow-hidden">
+        <div className="w-full h-44 overflow-hidden bg-green-50 shrink-0">
           <img
             src={event.image_url}
             alt={event.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
           />
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-4 flex flex-col min-w-0 overflow-hidden gap-1.5">
+        <div className="flex flex-col gap-1.5 px-3 pt-2.5 pb-3 flex-1">
+          <h3 className="font-bold text-gray-900 text-base leading-snug group-hover:text-[#9FB366] transition-colors line-clamp-2 w-full">
+            {event.title}
+          </h3>
 
-          {/* Title + like button */}
-          <div className="flex items-start gap-2">
-            <h3 className="flex-1 text-lg font-bold text-gray-900 leading-tight line-clamp-1 group-hover:text-[#9FB366] transition-colors">
-              {event.title}
-            </h3>
-            <button
-              className={`shrink-0 flex items-center gap-1 transition-colors ${
-                liked ? "text-red-500" : "text-gray-300 hover:text-red-400"
-              }`}
-              onClick={(e) => { e.preventDefault(); onToggleLike?.(event.id); }}
-              aria-label={liked ? "Unlike event" : "Like event"}
-            >
-              ❤️ <span className="text-xs text-gray-500">{likeCount ?? 0}</span>
-            </button>
+          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            <Calendar size={12} className="text-[#97BFFF]" aria-hidden="true" />
+            <span>{formatDate(event.date)}</span>
+            <span className="mx-0.5">·</span>
+            <Clock size={12} className="text-[#FFA86C]" aria-hidden="true" />
+            <span>{event.time}</span>
           </div>
 
-          {/* Meta — single row */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
-            {event.date && (
-              <span className="flex items-center gap-1">
-                <Calendar size={11} className="text-[#97BFFF] shrink-0" />
-                {formatDate(event.date)}
-              </span>
-            )}
-            {event.time && (
-              <span className="flex items-center gap-1">
-                <Clock size={11} className="text-[#FFA86C] shrink-0" />
-                {event.time}
-              </span>
-            )}
-            {event.space_name && (
-              <span className="flex items-center gap-1 truncate">
-                <MapPin size={11} className="text-[#FD858A] shrink-0" />
-                <span className="truncate">{event.space_name}, Seattle</span>
-              </span>
-            )}
+          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            <MapPin size={12} className="text-[#FD858A]" aria-hidden="true" />
+            <span className="truncate">
+              {event.space_name} · {event.neighborhood}
+            </span>
           </div>
 
-          {/* Description */}
-          {event.description && (
-            <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
-              {event.description}
-            </p>
-          )}
+          <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed mt-0.5">
+            {event.description}
+          </p>
 
-          {/* Tags + action buttons — pushed to bottom */}
-          <div className="flex items-center justify-between mt-auto gap-2">
+          <div className="flex items-center justify-between mt-auto pt-2 gap-2">
             <div className="flex flex-wrap gap-1 min-w-0 overflow-hidden">
-              <span className={`text-sm px-3 py-1 rounded-full font-semibold ${costClass}`}>
-                {costLabel}
-              </span>
-              {event.tags?.slice(0, 2).map((tag) => (
+              {event.tags?.slice(0, 3).map((tag) => (
                 <span
                   key={tag}
-                  className="text-sm px-3 py-1 rounded-full border border-green-300 text-green-700 capitalize whitespace-nowrap"
+                  className="text-sm bg-green-50 text-green-700 px-3 py-1 rounded-full capitalize font-medium whitespace-nowrap"
                 >
                   {tag.replace(/_/g, " ")}
                 </span>
               ))}
             </div>
-
-            {/* Action buttons */}
+            {/* Action buttons — like inline with the rest */}
             <div className="flex gap-1 shrink-0" onClick={(e) => e.preventDefault()}>
+              <button
+                onClick={(e) => { e.preventDefault(); onToggleLike?.(event.id); }}
+                className={`p-2.5 rounded-lg border transition-colors flex items-center gap-1 ${
+                  liked
+                    ? "border-red-300 text-red-500 bg-red-50"
+                    : "border-gray-400 hover:border-red-400 hover:text-red-500 text-gray-600"
+                }`}
+                aria-label={liked ? "Unlike event" : "Like event"}
+              >
+                ❤️ <span className="text-xs">{likeCount ?? 0}</span>
+              </button>
+
               <button
                 onClick={() => onToggleBookmark?.(event.id)}
                 className={`p-2.5 rounded-lg border transition-colors ${
                   bookmarked
                     ? "border-[#9FB366] text-[#9FB366] bg-green-50"
-                    : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500"
+                    : "border-gray-400 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-600"
                 }`}
                 aria-label={bookmarked ? "Remove bookmark" : "Bookmark event"}
               >
@@ -318,7 +437,7 @@ function FeedCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
                 className={`p-2.5 rounded-lg border transition-colors ${
                   copied
                     ? "border-[#9FB366] text-[#9FB366] bg-green-50"
-                    : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500"
+                    : "border-gray-400 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-600"
                 }`}
                 aria-label={copied ? "Link copied!" : "Share event"}
               >
@@ -327,111 +446,15 @@ function FeedCard({ event, costClass, costLabel, liked, likeCount, onToggleLike,
             </div>
           </div>
         </div>
-      </div>
-    </Link>
-    <CopiedToast visible={copied} />
-  </>
-  );
-}
-
-// ── Grid card (vertical) — used on Events page ────────────────────────────────
-function GridCard({ event, costClass, costLabel, liked, likeCount, onToggleLike, bookmarked, onToggleBookmark }) {
-  const { calOpen, setCalOpen, calRef, copied, handleShare } = useEventActions(event);
-
-  return (
-    <>
-    <Link
-      to={`/events/${event.id}`}
-      className="group flex flex-col bg-white rounded-2xl border border-gray-200 hover:border-green-300 hover:shadow-lg transition-all overflow-hidden"
-      aria-label={`View details for ${event.title}`}
-    >
-      {/* Image */}
-      <div className="w-full h-44 overflow-hidden bg-green-50 shrink-0">
-        <img
-          src={event.image_url}
-          alt={event.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          loading="lazy"
-        />
-      </div>
-
-      {/* Content */}
-      <div className="flex flex-col gap-1.5 px-3 pt-2.5 pb-3 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="font-bold text-gray-900 text-base leading-snug group-hover:text-[#9FB366] transition-colors line-clamp-2 flex-1">
-            {event.title}
-          </h3>
-          <button
-            className={`shrink-0 flex items-center gap-1 transition-colors ${
-              liked ? "text-red-500" : "text-gray-300 hover:text-red-400"
-            }`}
-            onClick={(e) => { e.preventDefault(); onToggleLike?.(event.id); }}
-            aria-label={liked ? "Unlike event" : "Like event"}
-          >
-            ❤️ <span className="text-xs text-gray-500">{likeCount ?? 0}</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-          <Calendar size={12} className="text-[#97BFFF]" aria-hidden="true" />
-          <span>{formatDate(event.date)}</span>
-          <span className="mx-0.5">·</span>
-          <Clock size={12} className="text-[#FFA86C]" aria-hidden="true" />
-          <span>{event.time}</span>
-        </div>
-
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-          <MapPin size={12} className="text-[#FD858A]" aria-hidden="true" />
-          <span className="truncate">
-            {event.space_name} · {event.neighborhood}
-          </span>
-        </div>
-
-        <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed mt-0.5">
-          {event.description}
-        </p>
-
-        <div className="flex items-center justify-between mt-auto pt-2 gap-2">
-          <div className="flex flex-wrap gap-1 min-w-0 overflow-hidden">
-            {event.tags?.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="text-sm bg-green-50 text-green-700 px-3 py-1 rounded-full capitalize font-medium whitespace-nowrap"
-              >
-                {tag.replace(/_/g, " ")}
-              </span>
-            ))}
-          </div>
-          <div className="flex gap-1 shrink-0" onClick={(e) => e.preventDefault()}>
-            <button
-              onClick={() => onToggleBookmark?.(event.id)}
-              className={`p-2.5 rounded-lg border transition-colors ${
-                bookmarked
-                  ? "border-[#9FB366] text-[#9FB366] bg-green-50"
-                  : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500"
-              }`}
-              aria-label={bookmarked ? "Remove bookmark" : "Bookmark event"}
-            >
-              <Bookmark size={16} />
-            </button>
-
-            <CalendarDropdown event={event} calRef={calRef} calOpen={calOpen} setCalOpen={setCalOpen} />
-
-            <button
-              onClick={handleShare}
-              className={`p-2.5 rounded-lg border transition-colors ${
-                copied
-                  ? "border-[#9FB366] text-[#9FB366] bg-green-50"
-                  : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-500"
-              }`}
-              aria-label={copied ? "Link copied!" : "Share event"}
-            >
-              {copied ? <Check size={16} /> : <Share2 size={16} />}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Link>
+      </Link>
+      {/* Thumbtack decoration */}
+      <img
+        src={thumbtackImg}
+        alt=""
+        aria-hidden="true"
+        className="absolute -top-6 -right-3 w-[80px] pointer-events-none select-none z-10 rotate-12"
+      />
+    </div>
     <CopiedToast visible={copied} />
     </>
   );

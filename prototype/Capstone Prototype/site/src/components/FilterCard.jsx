@@ -1,20 +1,26 @@
 import { X } from "lucide-react";
-import { NEIGHBORHOODS, CATEGORIES, ACCESSIBILITY_OPTIONS } from "../utils/filters";
+import {
+  NEIGHBORHOODS,
+  CATEGORIES,
+  ACCESSIBILITY_OPTIONS,
+} from "../utils/filters";
+import filterBackImg from "../../wireframes/ffilterback.png";
+import tapeImg from "../../wireframes/graybluetape1.png";
 
 const COST_OPTIONS = [
   { id: "all", label: "All" },
   { id: "free", label: "Free only" },
-  { id: "paid", label: "Paid only" }
+  { id: "paid", label: "Paid only" },
 ];
 
-export default function FilterCard({ filters, onChange, onClear }) {
+export default function FilterCard({ filters, onChange, onClear, heading }) {
   const activeCount = [
     filters.neighborhoods?.length > 0,
     filters.categories?.length > 0,
     filters.dateFrom,
     filters.dateTo,
     filters.cost !== "all",
-    filters.accessibility?.length > 0
+    filters.accessibility?.length > 0,
   ].filter(Boolean).length;
 
   function toggle(key, value) {
@@ -25,11 +31,8 @@ export default function FilterCard({ filters, onChange, onClear }) {
     onChange({ ...filters, [key]: next });
   }
 
-  return (
-    <aside
-      className="bg-white border border-gray-200 rounded-xl p-5 space-y-5 w-full"
-      aria-label="Event filters"
-    >
+  const filterControls = (
+    <>
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-gray-900 text-sm uppercase tracking-wide">
@@ -59,7 +62,10 @@ export default function FilterCard({ filters, onChange, onClear }) {
         </legend>
         <div className="space-y-1.5">
           {CATEGORIES.map((cat) => (
-            <label key={cat.id} className="flex items-center gap-2 cursor-pointer group">
+            <label
+              key={cat.id}
+              className="flex items-center gap-2 cursor-pointer group"
+            >
               <input
                 type="checkbox"
                 checked={filters.categories?.includes(cat.id) ?? false}
@@ -85,7 +91,7 @@ export default function FilterCard({ filters, onChange, onClear }) {
           onChange={(e) =>
             onChange({
               ...filters,
-              neighborhoods: e.target.value ? [e.target.value] : []
+              neighborhoods: e.target.value ? [e.target.value] : [],
             })
           }
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -109,14 +115,18 @@ export default function FilterCard({ filters, onChange, onClear }) {
           <input
             type="date"
             value={filters.dateFrom ?? ""}
-            onChange={(e) => onChange({ ...filters, dateFrom: e.target.value || null })}
+            onChange={(e) =>
+              onChange({ ...filters, dateFrom: e.target.value || null })
+            }
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
             aria-label="Filter from date"
           />
           <input
             type="date"
             value={filters.dateTo ?? ""}
-            onChange={(e) => onChange({ ...filters, dateTo: e.target.value || null })}
+            onChange={(e) =>
+              onChange({ ...filters, dateTo: e.target.value || null })
+            }
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
             aria-label="Filter to date"
           />
@@ -130,7 +140,10 @@ export default function FilterCard({ filters, onChange, onClear }) {
         </legend>
         <div className="space-y-1.5">
           {COST_OPTIONS.map((opt) => (
-            <label key={opt.id} className="flex items-center gap-2 cursor-pointer group">
+            <label
+              key={opt.id}
+              className="flex items-center gap-2 cursor-pointer group"
+            >
               <input
                 type="radio"
                 name="cost"
@@ -155,7 +168,10 @@ export default function FilterCard({ filters, onChange, onClear }) {
         </legend>
         <div className="space-y-1.5">
           {ACCESSIBILITY_OPTIONS.map((opt) => (
-            <label key={opt.id} className="flex items-center gap-2 cursor-pointer group">
+            <label
+              key={opt.id}
+              className="flex items-center gap-2 cursor-pointer group"
+            >
               <input
                 type="checkbox"
                 checked={filters.accessibility?.includes(opt.id) ?? false}
@@ -170,6 +186,54 @@ export default function FilterCard({ filters, onChange, onClear }) {
           ))}
         </div>
       </fieldset>
+    </>
+  );
+
+  // Desktop sidebar: paper outer container with tape + heading + solid filter card inside
+  if (heading) {
+    return (
+      <div className="relative">
+        {/* Tape — anchored to the corner of the whole sidebar, outside overflow-hidden */}
+        <img
+          src={tapeImg}
+          alt=""
+          aria-hidden="true"
+          className="absolute -top-4 -right-7 w-36 -rotate-6 pointer-events-none select-none z-20"
+        />
+
+        {/* Paper background, clipped to rounded corners */}
+        <div
+          className="relative rounded-2xl overflow-hidden"
+          style={{
+            backgroundImage: `url(${filterBackImg})`,
+            backgroundSize: "120%",
+            backgroundPosition: "top center",
+          }}
+        >
+          {/* "Your Feed" heading on the paper */}
+          <h2 className="text-2xl font-bold text-gray-900 px-6 pt-6 pb-3">
+            {heading}
+          </h2>
+
+          {/* Solid-background filter panel, centered on the paper */}
+          <aside
+            className="bg-[#F5F0E8] border border-gray-200 rounded-xl mx-5 mb-6 p-5 space-y-5"
+            aria-label="Event filters"
+          >
+            {filterControls}
+          </aside>
+        </div>
+      </div>
+    );
+  }
+
+  // Mobile drawer: plain aside, no paper decorations
+  return (
+    <aside
+      className="bg-white border border-gray-200 rounded-xl p-5 space-y-5 w-full"
+      aria-label="Event filters"
+    >
+      {filterControls}
     </aside>
   );
 }

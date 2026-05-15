@@ -23,8 +23,10 @@ const ZONES = [
   { coords: pct(1797, 830, 2039, 1138), to: "/events?cost=paid",                 label: "Paid events" },
 ];
 
-// Active card is 55% of the full-width viewport; ~22% of each adjacent card is visible
-const CARD_RATIO = 0.55;
+// Card matches the navbar content column: max-w-7xl (1280px) minus px-4 (16px) each side
+const NAVBAR_MAX_W = 1280;
+const NAVBAR_PX    = 16;
+const CARD_MAX_W   = NAVBAR_MAX_W - NAVBAR_PX * 2; // 1248px
 const GAP = 24; // px between cards
 
 const DEFAULT_INDEX = bulletins.findIndex(b => b.id === "feb-2026");
@@ -44,7 +46,7 @@ export default function BulletinBoard() {
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  const cardWidth  = containerWidth * CARD_RATIO;
+  const cardWidth  = Math.min(containerWidth - NAVBAR_PX * 2, CARD_MAX_W);
   const cardHeight = cardWidth * (MAP_H / MAP_W);
   const peekOffset = (containerWidth - cardWidth) / 2; // centers card 0
   const translateX = peekOffset - activeIndex * (cardWidth + GAP);

@@ -2,47 +2,101 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { neighborhoods } from "../data/neighborhoods";
+
+// ── Neighborhood images ───────────────────────────────────────────────────────
+import imgCapitolHill from "../../images/neighborhood_images/capitolhill.jpg";
+import imgBallard from "../../images/neighborhood_images/ballard.png";
+import imgBelltown from "../../images/neighborhood_images/belltown.webp";
+import imgFremont from "../../images/neighborhood_images/fremont.jpg";
+import imgSouthLakeUnion from "../../images/neighborhood_images/southlakeunion.jpg";
+import imgUDistrict from "../../images/neighborhood_images/udistrict.jpg";
+
+// ── Tape stickers (one per card, no repeats) ──────────────────────────────────
+import tapeBluetape from "../../images/stickers/bluetape.png";
+import tapeDotstape from "../../images/stickers/dotstape.png";
+import tapeGreentape from "../../images/stickers/greentape.png";
+import tapeRedplaidtape from "../../images/stickers/redplaidtape.png";
+import tapeStartape from "../../images/stickers/startape.png";
+import tapeYellowtape from "../../images/stickers/yellowtape.png";
+
+const NEIGHBORHOOD_IMAGES = {
+  "capitol-hill": imgCapitolHill,
+  ballard: imgBallard,
+  belltown: imgBelltown,
+  fremont: imgFremont,
+  "south-lake-union": imgSouthLakeUnion,
+  "university-district": imgUDistrict,
+};
+
+const NEIGHBORHOOD_TAPES = {
+  "capitol-hill": tapeBluetape,
+  ballard: tapeDotstape,
+  belltown: tapeGreentape,
+  fremont: tapeRedplaidtape,
+  "south-lake-union": tapeStartape,
+  "university-district": tapeYellowtape,
+};
 import { events as staticEvents } from "../data/events";
 import { useUser } from "../context/UserContext";
 import EventCard from "../components/EventCard";
 import EmptyState from "../components/EmptyState";
 import NeighborhoodsMap from "../components/NeighborhoodsMap";
+import thumbtackImg from "../../wireframes/thumbtack.png";
 
 // ─── Neighborhood grid card ───────────────────────────────────────────────────
 function NeighborhoodTile({ neighborhood, onClick }) {
-  return (
-    <button
-      onClick={() => onClick(neighborhood.id)}
-      className="group flex flex-col items-center w-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 rounded-[28px]"
-      aria-label={`Explore ${neighborhood.name}`}
-    >
-      {/* Image with large rounded corners and wavy cookie-cutout bottom edge */}
-      <div className="relative w-full rounded-[28px] overflow-hidden aspect-square">
-        <img
-          src={neighborhood.image_url}
-          alt={neighborhood.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-          loading="lazy"
-        />
-        {/* Wavy SVG overlay cuts into the bottom of the image */}
-        <svg
-          className="absolute bottom-0 left-0 w-full h-10"
-          viewBox="0 0 400 40"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path
-            d="M0,20 Q100,0 200,20 Q300,40 400,20 L400,40 L0,40 Z"
-            fill="#f9fafb"
-          />
-        </svg>
-      </div>
+  const image = NEIGHBORHOOD_IMAGES[neighborhood.id];
+  const tape = NEIGHBORHOOD_TAPES[neighborhood.id];
+  if (!image) return null;
 
-      {/* Name below the card */}
-      <h2 className="mt-3 text-base font-semibold text-gray-900 group-hover:text-[#9FB366] transition-colors text-center">
-        {neighborhood.name}
-      </h2>
-    </button>
+  return (
+    // pt-6 reserves space above the card so the tape isn't clipped
+    <div className="relative pt-6">
+      {/*
+        ── NEIGHBORHOODS PAGE TAPE ────────────────────────────────────────────
+        Edit tape appearance HERE for the neighborhoods page grid only.
+        Main page carousel tape is in NeighborhoodCarousel.jsx.
+        • Size:     w-38 (w-28 smaller · w-44 bigger)
+        • Up/down:  -translate-y-1/14 (1/3 lower · 1/2 higher)
+        • Tilt:     add rotate-3 or -rotate-6
+        ──────────────────────────────────────────────────────────────────────
+      */}
+      <img
+        src={tape}
+        alt=""
+        aria-hidden="true"
+        className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/14 w-38 z-10 pointer-events-none select-none drop-shadow-sm"
+      />
+
+      <button
+        onClick={() => onClick(neighborhood.id)}
+        className="group flex flex-col items-center w-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 rounded-[28px]"
+        aria-label={`Explore ${neighborhood.name}`}
+      >
+        <div className="relative w-full rounded-[28px] overflow-hidden aspect-square">
+          <img
+            src={image}
+            alt={neighborhood.name}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            loading="lazy"
+          />
+          <svg
+            className="absolute bottom-0 left-0 w-full h-10"
+            viewBox="0 0 400 40"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M0,20 Q100,0 200,20 Q300,40 400,20 L400,40 L0,40 Z"
+              fill="#f9fafb"
+            />
+          </svg>
+        </div>
+        <h2 className="mt-2 text-3xl font-semibold text-gray-900 group-hover:text-[#9FB366] transition-colors text-center">
+          {neighborhood.name}
+        </h2>
+      </button>
+    </div>
   );
 }
 
@@ -140,7 +194,8 @@ export default function Neighborhoods() {
       .filter(
         (e) =>
           !e.attending_limit ||
-          (e.attending_count || 0) + (attendingEvents.has(e.id) ? 1 : 0) < e.attending_limit,
+          (e.attending_count || 0) + (attendingEvents.has(e.id) ? 1 : 0) <
+            e.attending_limit,
       );
   }, [createdEvents, deletedEventIds, editedEvents, attendingEvents]);
 
@@ -184,11 +239,24 @@ export default function Neighborhoods() {
     <main className="bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 py-10">
         {/* Interactive map */}
-        <div className="mb-10">
+        <div className="relative mb-10">
           <NeighborhoodsMap
             events={allEvents}
             selectedNeighborhood={mapSelectedNeighborhood}
             onNeighborhoodClick={handleMapNeighborhoodClick}
+            height={600}
+          />
+          <img
+            src={thumbtackImg}
+            alt=""
+            aria-hidden="true"
+            className="absolute -top-6 left-60 w-[80px] pointer-events-none select-none z-10 -rotate-12 scale-x-[-1]"
+          />
+          <img
+            src={thumbtackImg}
+            alt=""
+            aria-hidden="true"
+            className="absolute -top-6 -right-3 w-[80px] pointer-events-none select-none z-10 rotate-12"
           />
         </div>
 
@@ -202,15 +270,17 @@ export default function Neighborhoods() {
           </p>
         </div>
 
-        {/* Neighborhood grid — 3 per row */}
+        {/* Neighborhood grid — 3 per row, only cards with a custom image */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {neighborhoods.map((n) => (
-            <NeighborhoodTile
-              key={n.id}
-              neighborhood={n}
-              onClick={handleSelect}
-            />
-          ))}
+          {neighborhoods
+            .filter((n) => NEIGHBORHOOD_IMAGES[n.id])
+            .map((n) => (
+              <NeighborhoodTile
+                key={n.id}
+                neighborhood={n}
+                onClick={handleSelect}
+              />
+            ))}
         </div>
       </div>
     </main>
