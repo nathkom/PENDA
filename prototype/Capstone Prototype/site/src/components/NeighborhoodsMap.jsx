@@ -30,9 +30,22 @@ const NEIGHBORHOOD_CENTERS = {
   "South Lake Union": { lat: 47.6257, lng: -122.3364 },
 };
 
+// The seattle-neighborhoods.geojson uses fine-grained sub-neighborhood names.
+// Four of our brand neighborhoods don't appear by name in that file, so we
+// adopt one representative sub-polygon for each and rewrite its `name`
+// property to the brand name at geojson load time. Highlights, click handling,
+// and pin sampling then "just work" for these neighborhoods, and the polygons
+// stay visually proportional to the others (no merging).
+const POLYGON_TO_NEIGHBORHOOD = {
+  Broadway: "Capitol Hill",
+  Adams: "Ballard",
+  Brighton: "Rainier Valley",
+  "North Admiral": "West Seattle",
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Deterministic integer hash of a string — used to spread event pins within a neighborhood
+// Deterministic integer hash of a string — used to seed pin placement per event.
 function hashString(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) {
@@ -40,6 +53,51 @@ function hashString(str) {
     h |= 0;
   }
   return h;
+}
+
+// Seeded PRNG (mulberry32). Produces a stream of [0, 1) values for a given seed.
+function mulberry32(seed) {
+  let state = seed >>> 0;
+  return function () {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Ray-casting point-in-ring test. ring = [[lng, lat], ...] (first == last).
+function pointInRing(lng, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const intersect =
+      yi > lat !== yj > lat &&
+      lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+// Polygon = [outerRing, hole1, hole2, ...]. Point is "in" iff inside outer and outside all holes.
+function pointInPolygon(lng, lat, rings) {
+  if (!rings.length || !pointInRing(lng, lat, rings[0])) return false;
+  for (let i = 1; i < rings.length; i++) {
+    if (pointInRing(lng, lat, rings[i])) return false;
+  }
+  return true;
+}
+
+function pointInGeometry(lng, lat, geometry) {
+  if (geometry.type === "Polygon") return pointInPolygon(lng, lat, geometry.coordinates);
+  if (geometry.type === "MultiPolygon") {
+    for (const poly of geometry.coordinates) {
+      if (pointInPolygon(lng, lat, poly)) return true;
+    }
+  }
+  return false;
 }
 
 function getNeighborhoodBounds(geometry) {
@@ -68,22 +126,46 @@ function getNeighborhoodBounds(geometry) {
   ];
 }
 
-// Build a GeoJSON FeatureCollection from events, placing each pin at an
-// approximate location within its neighborhood using a hash-based offset.
-function eventsToGeoJSON(events) {
+// Deterministic random sample inside the neighborhood polygon, seeded by event.id.
+// Rejection sampling against the polygon bbox; falls back to bbox center after N attempts.
+function sampleInPolygon(geometry, eventId) {
+  const [[minLng, minLat], [maxLng, maxLat]] = getNeighborhoodBounds(geometry);
+  const rand = mulberry32(hashString(eventId));
+  for (let i = 0; i < 80; i++) {
+    const lng = minLng + rand() * (maxLng - minLng);
+    const lat = minLat + rand() * (maxLat - minLat);
+    if (pointInGeometry(lng, lat, geometry)) return { lng, lat };
+  }
+  return { lng: (minLng + maxLng) / 2, lat: (minLat + maxLat) / 2 };
+}
+
+// Compute pin coordinates for a single event. Prefers polygon-bounded sampling
+// when the neighborhood geometry has loaded; falls back to a small hash offset
+// around the static neighborhood center.
+function computeEventCoords(event, geometries) {
+  const geom = geometries[event.neighborhood];
+  if (geom) return sampleInPolygon(geom, event.id);
+  const center = NEIGHBORHOOD_CENTERS[event.neighborhood];
+  if (!center) return null;
+  const h = hashString(event.id);
+  return {
+    lng: center.lng + ((((h >> 8) & 0xff) - 128) / 128) * 0.004,
+    lat: center.lat + (((h & 0xff) - 128) / 128) * 0.003,
+  };
+}
+
+// Build a GeoJSON FeatureCollection from events, placing each pin via the
+// polygon-bounded sampler when geometries are available.
+function eventsToGeoJSON(events, geometries) {
   return {
     type: "FeatureCollection",
     features: events
       .map((event) => {
-        const center = NEIGHBORHOOD_CENTERS[event.neighborhood];
-        if (!center) return null;
-        const h = hashString(event.id);
-        // Normalise to [-1, 1] then scale to ±0.003° lat / ±0.004° lng ≈ ±330 m
-        const lat = center.lat + (((h & 0xff) - 128) / 128) * 0.003;
-        const lng = center.lng + ((((h >> 8) & 0xff) - 128) / 128) * 0.004;
+        const coords = computeEventCoords(event, geometries);
+        if (!coords) return null;
         return {
           type: "Feature",
-          geometry: { type: "Point", coordinates: [lng, lat] },
+          geometry: { type: "Point", coordinates: [coords.lng, coords.lat] },
           properties: {
             id: event.id,
             title: event.title,
@@ -298,6 +380,7 @@ export default function NeighborhoodsMap({
   const [hoveredNeighborhoodId, setHoveredNeighborhoodId] = useState(null);
   const [cursor, setCursor] = useState("grab");
   const [neighborhoodGeometries, setNeighborhoodGeometries] = useState({});
+  const [geojsonData, setGeojsonData] = useState(null);
 
   // Always-current view state for snapshot-before-zoom
   const viewStateRef = useRef({
@@ -321,8 +404,19 @@ export default function NeighborhoodsMap({
     fetch(`${import.meta.env.BASE_URL}seattle-neighborhoods.geojson`)
       .then((r) => r.json())
       .then((data) => {
+        // Rename the four representative sub-polygons to their brand names
+        // (Broadway → "Capitol Hill", Adams → "Ballard", etc.) so that the
+        // existing paint, click, and pin-sampling logic — which all key off
+        // properties.name — works for these neighborhoods without code changes.
+        const features = data.features.map((f) => {
+          const srcName = f.properties?.name;
+          const brand = POLYGON_TO_NEIGHBORHOOD[srcName];
+          if (!brand) return f;
+          return { ...f, properties: { ...f.properties, name: brand } };
+        });
+
         const geometries = {};
-        data.features.forEach((f) => {
+        features.forEach((f) => {
           const name = f.properties?.name;
           if (
             name &&
@@ -333,6 +427,7 @@ export default function NeighborhoodsMap({
           }
         });
         setNeighborhoodGeometries(geometries);
+        setGeojsonData({ ...data, features });
       })
       .catch(() => {});
   }, []);
@@ -407,8 +502,8 @@ export default function NeighborhoodsMap({
     const subset = selectedNeighborhood
       ? filteredEvents.filter((e) => e.neighborhood !== selectedNeighborhood)
       : filteredEvents;
-    return eventsToGeoJSON(subset);
-  }, [filteredEvents, selectedNeighborhood]);
+    return eventsToGeoJSON(subset, neighborhoodGeometries);
+  }, [filteredEvents, selectedNeighborhood, neighborhoodGeometries]);
 
   // Selected neighborhood events — shown unclustered so individual pins are visible
   const selectedEventsGeoJSON = useMemo(() => {
@@ -416,18 +511,13 @@ export default function NeighborhoodsMap({
       return { type: "FeatureCollection", features: [] };
     return eventsToGeoJSON(
       filteredEvents.filter((e) => e.neighborhood === selectedNeighborhood),
+      neighborhoodGeometries,
     );
-  }, [filteredEvents, selectedNeighborhood]);
+  }, [filteredEvents, selectedNeighborhood, neighborhoodGeometries]);
 
   // Helper: compute a pin's map coordinates from an event (mirrors eventsToGeoJSON)
   function getEventCoords(event) {
-    const center = NEIGHBORHOOD_CENTERS[event.neighborhood];
-    if (!center) return null;
-    const h = hashString(event.id);
-    return {
-      lng: center.lng + ((((h >> 8) & 0xff) - 128) / 128) * 0.004,
-      lat: center.lat + (((h & 0xff) - 128) / 128) * 0.003,
-    };
+    return computeEventCoords(event, neighborhoodGeometries);
   }
 
   // ── Mapbox paint expressions ──────────────────────────────────────────────
@@ -726,7 +816,7 @@ export default function NeighborhoodsMap({
             <Source
               id="neighborhoods"
               type="geojson"
-              data={`${import.meta.env.BASE_URL}seattle-neighborhoods.geojson`}
+              data={geojsonData ?? { type: "FeatureCollection", features: [] }}
               promoteId="cartodb_id"
             >
               <Layer

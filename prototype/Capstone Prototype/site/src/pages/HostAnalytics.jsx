@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Eye, Heart, Bookmark, Users } from "lucide-react";
+import { Eye, Heart, Bookmark, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { useUser } from "../context/UserContext";
 import { fetchHostEvents, fetchHostAnalytics } from "../lib/analytics";
+import EventAnalyticsDetail from "../components/EventAnalyticsDetail";
 
 const CATEGORY_COLORS = {
   social: "bg-blue-100 text-blue-700",
@@ -58,6 +59,16 @@ export default function HostAnalytics() {
   const [counts, setCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+
+  function toggleExpanded(id) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!isHost || !user?.id) return;
@@ -157,6 +168,7 @@ export default function HostAnalytics() {
             {events.map((ev) => {
               const c = counts[ev.id] || {};
               const catClass = CATEGORY_COLORS[ev.category] || "bg-gray-100 text-gray-600";
+              const isExpanded = expandedIds.has(ev.id);
               return (
                 <article
                   key={ev.id}
@@ -187,8 +199,23 @@ export default function HostAnalytics() {
                       <MetricChip icon={Heart} color={ICON_COLORS.like} value={c.like || 0} />
                       <MetricChip icon={Bookmark} color={ICON_COLORS.bookmark} value={c.bookmark || 0} />
                       <MetricChip icon={Users} color={ICON_COLORS.attendees} value={ev.attending_count || 0} />
+                      <button
+                        onClick={() => toggleExpanded(ev.id)}
+                        className="flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700 hover:border-[#9FB366] hover:text-[#9FB366] transition-colors"
+                        aria-expanded={isExpanded}
+                        aria-controls={`details-${ev.id}`}
+                      >
+                        {isExpanded ? "Hide details" : "View details"}
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
                     </div>
                   </div>
+
+                  {isExpanded && (
+                    <div id={`details-${ev.id}`}>
+                      <EventAnalyticsDetail eventId={ev.id} />
+                    </div>
+                  )}
                 </article>
               );
             })}

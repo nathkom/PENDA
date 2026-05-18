@@ -33,3 +33,29 @@ export async function fetchHostAnalytics(hostId) {
   }
   return counts;
 }
+
+// Fetches raw timestamped action rows for a single event.
+// Returns { actions: [{action, created_at}], attendance: [{created_at}] }.
+// Caller buckets these into daily series client-side.
+export async function fetchEventTimeSeries(eventId, sinceIso) {
+  let analyticsQuery = supabase
+    .from("event_analytics")
+    .select("action, created_at")
+    .eq("event_id", eventId);
+  let attendanceQuery = supabase
+    .from("event_attendance")
+    .select("created_at")
+    .eq("event_id", eventId);
+
+  if (sinceIso) {
+    analyticsQuery = analyticsQuery.gte("created_at", sinceIso);
+    attendanceQuery = attendanceQuery.gte("created_at", sinceIso);
+  }
+
+  const [{ data: actions, error: aErr }, { data: attendance, error: atErr }] =
+    await Promise.all([analyticsQuery, attendanceQuery]);
+  if (aErr) throw aErr;
+  if (atErr) throw atErr;
+
+  return { actions: actions ?? [], attendance: attendance ?? [] };
+}
