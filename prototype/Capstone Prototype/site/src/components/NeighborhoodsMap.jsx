@@ -371,6 +371,12 @@ export default function NeighborhoodsMap({
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
   }
+
+  // Mapbox caches canvas dimensions, so a height change on the container
+  // does not automatically redraw the canvas at the new size — call resize().
+  useEffect(() => {
+    mapRef.current?.resize();
+  }, [mapHeight]);
   const [viewState, setViewState] = useState({
     longitude: SEATTLE_CENTER.lng,
     latitude: SEATTLE_CENTER.lat,
