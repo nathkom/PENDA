@@ -3,25 +3,115 @@ import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { bulletins } from "../data/bulletin";
 
-// Clickable zone coords generated for a 2120 × 1196 image
+// ─── Clickable Overlay Zones ─────────────────────────────────────────────────
+//
+// All source images must be 2120 × 1196 px. pct() converts pixel coordinates
+// measured on that canvas to %-based CSS so zones scale with the card.
+//
+// HOW TO MEASURE COORDINATES
+//   1. Open the bulletin image in any editor (Figma, Preview, Paint).
+//   2. Hover over the TOP-LEFT corner of the area you want clickable → note x1, y1.
+//   3. Hover over the BOTTOM-RIGHT corner → note x2, y2.
+//   4. Pass those four values to pct(x1, y1, x2, y2).
+//
+// HOW TO ADD A ZONE
+//   1. Find (or add) the bulletin's id key in ZONES_BY_BULLETIN below.
+//   2. Push a new object into that array:
+//        { coords: pct(x1, y1, x2, y2), to: "/route-or-url", label: "Description" }
+//      `to`    – any React Router path or query string (e.g. "/events?cost=free")
+//      `label` – plain-English description used for accessibility / hover title
+//
+// HOW TO ADJUST A ZONE
+//   Change the four numbers inside pct() for that entry. Increasing x2/y2 makes
+//   the zone larger; shifting x1/y1 moves its top-left anchor.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 const MAP_W = 2120;
 const MAP_H = 1196;
 
-function pct(x, y, x2, y2) {
+function pct(x1, y1, x2, y2) {
   return {
-    left:   `${(x        / MAP_W) * 100}%`,
-    top:    `${(y        / MAP_H) * 100}%`,
-    width:  `${((x2 - x) / MAP_W) * 100}%`,
-    height: `${((y2 - y) / MAP_H) * 100}%`,
+    left:   `${(x1         / MAP_W) * 100}%`,
+    top:    `${(y1         / MAP_H) * 100}%`,
+    width:  `${((x2 - x1) / MAP_W) * 100}%`,
+    height: `${((y2 - y1) / MAP_H) * 100}%`,
   };
 }
 
-const ZONES = [
-  { coords: pct(83,   638, 665,  1136), to: "/events/evt-051",                   label: "Most Liked Space: Cafe Matcha Place" },
-  { coords: pct(1797, 201, 2039, 501),  to: "/events?neighborhood=capitol-hill", label: "Capitol Hill events" },
-  { coords: pct(1797, 536, 2039, 813),  to: "/events?cost=free",                 label: "Free events" },
-  { coords: pct(1797, 830, 2039, 1138), to: "/events?cost=paid",                 label: "Paid events" },
-];
+// Each key matches a bulletin `id` from data/bulletin.js.
+// Bulletins with no entry here will simply have no clickable zones.
+const ZONES_BY_BULLETIN = {
+
+  // ── February 2026 ──────────────────────────────────────────────────────────
+  "feb-2026": [
+    { coords: pct(83, 650, 665,  1136), to: "", label: "Most Liked Space" },
+    { coords:pct(143, 363, 619,  590), skew: "skewX(1deg)", to: "", label: "Explore spaces"  },
+    { coords:pct(680, 540, 869,  670), rotate: "5deg",to: "", label: "Editor 1"  },
+    { coords:pct(938, 560, 1125,  690), to: "", label: "Editor 2"  },
+    { coords:pct(1190, 542, 1380,  670), rotate: "-6deg", to: "", label: "Editor 3"  },
+    { coords: pct(1810, 215, 2049, 513),  rotate:"2deg", to: "", label: "Niche" },
+    { coords: pct(1263, 770, 1795,  1156), to: "", label: "Sweet and Savory" },
+    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free", label: "Free" },
+    { coords: pct(1810, 842, 2049, 1147), rotate:"1deg", to: "", label: "Community" },
+  ],
+
+  "mar-2026": [
+    { coords: pct(83, 650, 665,  1136), to: "", label: "Most Liked Space" },
+    { coords:pct(143, 363, 619,  590), skew: "skewX(1deg)", to: "", label: "Explore spaces"  },
+    { coords:pct(680, 540, 869,  670), rotate: "5deg",to: "", label: "Editor 1"  },
+    { coords:pct(938, 560, 1125,  690), to: "", label: "Editor 2"  },
+    { coords:pct(1190, 542, 1380,  670), rotate: "-6deg", to: "", label: "Editor 3"  },
+    { coords: pct(1810, 215, 2049, 513),  rotate:"2deg", to: "", label: "Niche" },
+    { coords: pct(1263, 770, 1795,  1156), to: "", label: "Sweet and Savory" },
+    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free", label: "Free" },
+    { coords: pct(1810, 842, 2049, 1147), rotate:"1deg", to: "", label: "Community" },
+  ],
+  "apr-2026": [
+    { coords: pct(83, 650, 665,  1136), to: "", label: "Most Liked Space" },
+    { coords:pct(143, 363, 619,  590), skew: "skewX(1deg)", to: "", label: "Explore spaces"  },
+    { coords:pct(680, 540, 869,  670), rotate: "5deg",to: "", label: "Editor 1"  },
+    { coords:pct(938, 560, 1125,  690), to: "", label: "Editor 2"  },
+    { coords:pct(1190, 542, 1380,  670), rotate: "-6deg", to: "", label: "Editor 3"  },
+    { coords: pct(1810, 215, 2049, 513),  rotate:"2deg", to: "", label: "Niche" },
+    { coords: pct(1263, 770, 1795,  1156), to: "", label: "Sweet and Savory" },
+    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free", label: "Free" },
+    { coords: pct(1810, 842, 2049, 1147), rotate:"1deg", to: "", label: "Community" },
+  ],
+  "may-2026": [
+    { coords: pct(83, 650, 665,  1136), to: "", label: "Most Liked Space" },
+    { coords:pct(143, 363, 619,  590), skew: "skewX(1deg)", to: "", label: "Explore spaces"  },
+    { coords:pct(680, 540, 869,  670), rotate: "5deg",to: "", label: "Editor 1"  },
+    { coords:pct(938, 560, 1125,  690), to: "", label: "Editor 2"  },
+    { coords:pct(1190, 542, 1380,  670), rotate: "-6deg", to: "", label: "Editor 3"  },
+    { coords: pct(1810, 215, 2049, 513),  rotate:"2deg", to: "", label: "Niche" },
+    { coords: pct(1263, 770, 1795,  1156), to: "", label: "Sweet and Savory" },
+    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free", label: "Free" },
+    { coords: pct(1810, 842, 2049, 1147), rotate:"1deg", to: "", label: "Community" },
+  ],
+  "jun-2026": [
+    { coords: pct(83, 650, 665,  1136), to: "", label: "Most Liked Space" },
+    { coords:pct(143, 363, 619,  590), skew: "skewX(1deg)", to: "", label: "Explore spaces"  },
+    { coords:pct(680, 540, 869,  670), rotate: "5deg",to: "", label: "Editor 1"  },
+    { coords:pct(938, 560, 1125,  690), to: "", label: "Editor 2"  },
+    { coords:pct(1190, 542, 1380,  670), rotate: "-6deg", to: "", label: "Editor 3"  },
+    { coords: pct(1810, 215, 2049, 513),  rotate:"2deg", to: "", label: "Niche" },
+    { coords: pct(1263, 770, 1795,  1156), to: "", label: "Sweet and Savory" },
+    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free", label: "Free" },
+    { coords: pct(1810, 842, 2049, 1147), rotate:"1deg", to: "", label: "Community" },
+  ],
+  "jul-2026": [
+    { coords: pct(83, 650, 665,  1136), to: "", label: "Most Liked Space" },
+    { coords:pct(143, 363, 619,  590), skew: "skewX(1deg)", to: "", label: "Explore spaces"  },
+    { coords:pct(680, 540, 869,  670), rotate: "5deg",to: "", label: "Editor 1"  },
+    { coords:pct(938, 560, 1125,  690), to: "", label: "Editor 2"  },
+    { coords:pct(1190, 542, 1380,  670), rotate: "-6deg", to: "", label: "Editor 3"  },
+    { coords: pct(1810, 215, 2049, 513),  rotate:"2deg", to: "", label: "Niche" },
+    { coords: pct(1263, 770, 1795,  1156), to: "", label: "Sweet and Savory" },
+    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free", label: "Free" },
+    { coords: pct(1810, 842, 2049, 1147), rotate:"1deg", to: "", label: "Community" },
+  ],
+};
 
 // Card matches the navbar content column: max-w-7xl (1280px) minus px-4 (16px) each side
 const NAVBAR_MAX_W = 1280;
@@ -86,14 +176,15 @@ export default function BulletinBoard() {
                   draggable={false}
                 />
 
-                {/* Clickable zones — only active on the current card */}
-                {i === activeIndex && ZONES.map((zone) => (
+                {/* Clickable zones — only rendered on the active card */}
+                {i === activeIndex && (ZONES_BY_BULLETIN[b.id] ?? []).map((zone) => (
                   <Link
                     key={zone.to}
                     to={zone.to}
                     aria-label={zone.label}
+                    title={zone.label}
                     className="absolute rounded hover:ring-2 hover:ring-[#5F77A5] hover:bg-[#5F77A5]/10 transition-all duration-150"
-                    style={{ ...zone.coords }}
+                    style={{ ...zone.coords , transform: zone.skew ?? "none" , rotate: zone.rotate ?? "0deg"}}
                   />
                 ))}
               </div>
