@@ -30,10 +30,14 @@ export default function Events() {
   const [filters, setFilters] = useState(() => {
     const nbParam = searchParams.get("neighborhood");
     const costParam = searchParams.get("cost");
+    const dateFromParam = searchParams.get("dateFrom");
+    const dateToParam = searchParams.get("dateTo");
     return {
       ...DEFAULT_FILTERS,
       neighborhoods: nbParam ? [nbParam] : [],
       cost: costParam && ["free", "paid"].includes(costParam) ? costParam : "all",
+      dateFrom: dateFromParam || null,
+      dateTo: dateToParam || null,
     };
   });
 

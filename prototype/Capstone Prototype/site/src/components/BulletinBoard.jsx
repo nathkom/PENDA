@@ -47,12 +47,12 @@ const ZONES_BY_BULLETIN = {
   "feb-2026": [
     { coords: pct(83, 650, 665,  1136), to: "", label: "Most Liked Space" },
     { coords:pct(143, 363, 619,  590), skew: "skewX(1deg)", to: "", label: "Explore spaces"  },
-    { coords:pct(680, 540, 869,  670), rotate: "5deg",to: "", label: "Editor 1"  },
-    { coords:pct(938, 560, 1125,  690), to: "", label: "Editor 2"  },
+    { coords:pct(680, 540, 869,  670), rotate: "5deg",to: "/events/afd4dd6b-b818-46f4-809e-0404a096360c", label: "Editor 1"  },
+    { coords:pct(938, 560, 1125,  690), to: "/events/99209b33-ca65-40b4-aef4-a8bfa69e56bf", label: "Editor 2"  },
     { coords:pct(1190, 542, 1380,  670), rotate: "-6deg", to: "", label: "Editor 3"  },
     { coords: pct(1810, 215, 2049, 513),  rotate:"2deg", to: "", label: "Niche" },
     { coords: pct(1263, 770, 1795,  1156), to: "", label: "Sweet and Savory" },
-    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free", label: "Free" },
+    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free&dateFrom=2026-02-01&dateTo=2026-02-28", label: "Free" },
     { coords: pct(1810, 842, 2049, 1147), rotate:"1deg", to: "", label: "Community" },
   ],
 
@@ -64,7 +64,7 @@ const ZONES_BY_BULLETIN = {
     { coords:pct(1190, 542, 1380,  670), rotate: "-6deg", to: "", label: "Editor 3"  },
     { coords: pct(1810, 215, 2049, 513),  rotate:"2deg", to: "", label: "Niche" },
     { coords: pct(1263, 770, 1795,  1156), to: "", label: "Sweet and Savory" },
-    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free", label: "Free" },
+    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free&dateFrom=2026-03-01&dateTo=2026-03-31", label: "Free" },
     { coords: pct(1810, 842, 2049, 1147), rotate:"1deg", to: "", label: "Community" },
   ],
   "apr-2026": [
@@ -75,7 +75,7 @@ const ZONES_BY_BULLETIN = {
     { coords:pct(1190, 542, 1380,  670), rotate: "-6deg", to: "", label: "Editor 3"  },
     { coords: pct(1810, 215, 2049, 513),  rotate:"2deg", to: "", label: "Niche" },
     { coords: pct(1263, 770, 1795,  1156), to: "", label: "Sweet and Savory" },
-    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free", label: "Free" },
+    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free&dateFrom=2026-04-01&dateTo=2026-04-30", label: "Free" },
     { coords: pct(1810, 842, 2049, 1147), rotate:"1deg", to: "", label: "Community" },
   ],
   "may-2026": [
@@ -86,7 +86,7 @@ const ZONES_BY_BULLETIN = {
     { coords:pct(1190, 542, 1380,  670), rotate: "-6deg", to: "", label: "Editor 3"  },
     { coords: pct(1810, 215, 2049, 513),  rotate:"2deg", to: "", label: "Niche" },
     { coords: pct(1263, 770, 1795,  1156), to: "", label: "Sweet and Savory" },
-    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free", label: "Free" },
+    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free&dateFrom=2026-05-01&dateTo=2026-05-31", label: "Free" },
     { coords: pct(1810, 842, 2049, 1147), rotate:"1deg", to: "", label: "Community" },
   ],
   "jun-2026": [
@@ -97,7 +97,7 @@ const ZONES_BY_BULLETIN = {
     { coords:pct(1190, 542, 1380,  670), rotate: "-6deg", to: "", label: "Editor 3"  },
     { coords: pct(1810, 215, 2049, 513),  rotate:"2deg", to: "", label: "Niche" },
     { coords: pct(1263, 770, 1795,  1156), to: "", label: "Sweet and Savory" },
-    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free", label: "Free" },
+    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free&dateFrom=2026-06-01&dateTo=2026-06-30", label: "Free" },
     { coords: pct(1810, 842, 2049, 1147), rotate:"1deg", to: "", label: "Community" },
   ],
   "jul-2026": [
@@ -108,7 +108,7 @@ const ZONES_BY_BULLETIN = {
     { coords:pct(1190, 542, 1380,  670), rotate: "-6deg", to: "", label: "Editor 3"  },
     { coords: pct(1810, 215, 2049, 513),  rotate:"2deg", to: "", label: "Niche" },
     { coords: pct(1263, 770, 1795,  1156), to: "", label: "Sweet and Savory" },
-    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free", label: "Free" },
+    { coords: pct(1810, 526, 2052, 833), rotate:"-1deg",  to: "/events?cost=free&dateFrom=2026-07-01&dateTo=2026-07-31", label: "Free" },
     { coords: pct(1810, 842, 2049, 1147), rotate:"1deg", to: "", label: "Community" },
   ],
 };
@@ -119,10 +119,13 @@ const NAVBAR_PX    = 16;
 const CARD_MAX_W   = NAVBAR_MAX_W - NAVBAR_PX * 2; // 1248px
 const GAP = 24; // px between cards
 
-const DEFAULT_INDEX = bulletins.findIndex(b => b.id === "feb-2026");
+const MONTH_ABBR = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+const now = new Date();
+const currentMonthId = `${MONTH_ABBR[now.getMonth()]}-${now.getFullYear()}`;
+const DEFAULT_INDEX = Math.max(0, bulletins.findIndex(b => b.id === currentMonthId));
 
 export default function BulletinBoard() {
-  const [activeIndex, setActiveIndex] = useState(DEFAULT_INDEX >= 0 ? DEFAULT_INDEX : 0);
+  const [activeIndex, setActiveIndex] = useState(DEFAULT_INDEX);
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef(null);
 
