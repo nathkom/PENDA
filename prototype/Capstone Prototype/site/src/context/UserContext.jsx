@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { fetchUserAttendance, markAttendance, unmarkAttendance, trackAnalytic } from "../lib/events";
+import { fetchSpacesByHost, fetchAllSpaces } from "../lib/spaces";
 
 const UserContext = createContext(null);
 
@@ -42,15 +43,21 @@ export function UserProvider({ children }) {
 
       console.log("[auth] profile loaded:", profile);
 
-      const attendedIds = await fetchUserAttendance(authUser.id).catch(() => []);
+      const role = profile?.role ?? "user";
+
+      const [attendedIds, dbSpaces] = await Promise.all([
+        fetchUserAttendance(authUser.id).catch(() => []),
+        (role === "admin" ? fetchAllSpaces() : fetchSpacesByHost(authUser.id)).catch(() => []),
+      ]);
 
       setUser({
         id:    authUser.id,
         email: authUser.email,
         name:  profile?.full_name ?? authUser.email.split("@")[0],
-        role:  profile?.role ?? "user",
+        role,
       });
       setAttendingEvents(new Set(attendedIds));
+      setCreatedSpaces(dbSpaces);
     } catch (err) {
       console.error("[auth] fetchAndSetProfile failed:", err);
       setUser({
@@ -118,6 +125,9 @@ export function UserProvider({ children }) {
 
   function addCreatedSpace(space) {
     setCreatedSpaces((prev) => [space, ...prev]);
+  }
+  function replaceCreatedSpace(tempId, realSpace) {
+    setCreatedSpaces((prev) => prev.map((s) => (s.id === tempId ? realSpace : s)));
   }
   function deleteCreatedSpace(id) {
     setCreatedSpaces((prev) => prev.filter((s) => s.id !== id));
@@ -227,7 +237,7 @@ export function UserProvider({ children }) {
       value={{
         user, setUser, authLoading,
         signUp, signIn, signOut,
-        createdSpaces, setCreatedSpaces, addCreatedSpace, deleteCreatedSpace, updateCreatedSpace,
+        createdSpaces, setCreatedSpaces, addCreatedSpace, replaceCreatedSpace, deleteCreatedSpace, updateCreatedSpace,
         hostTemplates, addHostTemplate,
         createdEvents, addCreatedEvent, replaceCreatedEvent,
         deletedEventIds, deleteEvent,

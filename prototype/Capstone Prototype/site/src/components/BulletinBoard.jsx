@@ -57,7 +57,7 @@ const ZONES_BY_BULLETIN = {
   ],
 
   "mar-2026": [
-    { coords: pct(83, 650, 665,  1136), to: "", label: "Most Liked Space" },
+    { coords: pct(83, 650, 665,  1136), to: "/spaces/4bb131b6-5131-4c67-a3c2-51d19a6cad10", label: "Most Liked Space" },
     { coords:pct(143, 363, 619,  590), skew: "skewX(1deg)", to: "", label: "Explore spaces"  },
     { coords:pct(680, 540, 869,  670), rotate: "5deg",to: "", label: "Editor 1"  },
     { coords:pct(938, 560, 1125,  690), to: "", label: "Editor 2"  },

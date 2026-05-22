@@ -12,8 +12,8 @@ export default function Footer() {
               Common Grounds
             </span>
             <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
-              Helping greater Seattle find the local spaces and community events
-              that make this city feel like home.
+              Helping people in the Greater Seattle Area find local spaces, community events, and connections
+              that help make this city feel like home.
             </p>
             <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
               <Heart size={12} className="text-green-500" aria-hidden="true" />
@@ -58,7 +58,9 @@ export default function Footer() {
             <h3 className="text-white text-sm font-semibold uppercase tracking-wide mt-4">
               About
             </h3>
-            <p className="text-sm text-gray-400 leading-relaxed"></p>
+            <p className="text-sm text-gray-400 leading-relaxed">
+              INFO 2026 Capstone Project
+            </p>
           </div>
 
           {/* Contact */}
@@ -77,22 +79,10 @@ export default function Footer() {
                   <span className="block text-gray-300 font-medium">
                     General Inquiries
                   </span>
-                  hello@commongrounds.org
+                  nathankomi13@gmail.com
                 </span>
               </li>
-              <li className="flex items-start gap-2 text-sm text-gray-400">
-                <Mail
-                  size={15}
-                  className="mt-0.5 shrink-0 text-green-500"
-                  aria-hidden="true"
-                />
-                <span>
-                  <span className="block text-gray-300 font-medium">
-                    Submit an Event
-                  </span>
-                  events@commongrounds.org
-                </span>
-              </li>
+              
               <li className="flex items-start gap-2 text-sm text-gray-400">
                 <MapPin
                   size={15}
@@ -103,7 +93,7 @@ export default function Footer() {
                   <span className="block text-gray-300 font-medium">
                     Based in
                   </span>
-                  Seattle, WA — serving the greater Puget Sound region
+                  Seattle, WA - serving the Greater Seattle Area
                 </span>
               </li>
             </ul>

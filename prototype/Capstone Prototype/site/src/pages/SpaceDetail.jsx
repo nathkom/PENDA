@@ -176,7 +176,7 @@ export default function SpaceDetail() {
 
               {/* Description */}
               <div className="px-6 py-5">
-                <p className="text-gray-700 leading-relaxed">
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
                   {space.description}
                 </p>
               </div>

@@ -4,7 +4,10 @@ import {
   User, FileText, Calendar, Camera, Building2, Mail, Lock,
   Globe, Plus, Edit2, Eye, EyeOff, ChevronRight,
   Upload, MapPin, X, Check, Trash2, Bookmark, CalendarCheck, Users, BarChart3,
+  ArrowLeft, Clock,
 } from "lucide-react";
+import EventGallery from "../components/EventGallery";
+import AccessibilityTags from "../components/AccessibilityTags";
 import { useUser } from "../context/UserContext";
 import { events as staticEvents } from "../data/events";
 import { NEIGHBORHOODS } from "../utils/filters";
@@ -15,6 +18,13 @@ import {
   setEventHidden as setEventHiddenInDB,
   uploadEventImage,
 } from "../lib/events";
+import {
+  createSpace as createSpaceInDB,
+  updateSpace as updateSpaceInDB,
+  deleteSpace as deleteSpaceInDB,
+  setSpaceHidden as setSpaceHiddenInDB,
+  uploadSpaceImage,
+} from "../lib/spaces";
 import { useEvents } from "../hooks/useEvents";
 import BookmarkedEventsSection from "../components/BookmarkedEventsSection";
 import AttendingEventsSection from "../components/AttendingEventsSection";
@@ -228,6 +238,272 @@ function eventToForm(event) {
   };
 }
 
+// ─── Preview Helpers ──────────────────────────────────────────────────────────
+
+function formatPreviewDate(isoDate) {
+  if (!isoDate) return "";
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+  });
+}
+
+function getPreviewCrowdLabel(level) {
+  if (level <= 20) return "Quiet";
+  if (level <= 40) return "Light";
+  if (level <= 60) return "Moderately busy";
+  if (level <= 80) return "Busy";
+  return "Very busy";
+}
+
+const PREVIEW_COST_LABEL = { free: "Free", suggested_donation: "Fundraiser", paid: "Paid" };
+const PREVIEW_CATEGORY_LABELS = {
+  social: "Social", arts: "Arts & Culture", outdoors: "Outdoors",
+  food: "Food & Drink", sports: "Sports & Fitness", educational: "Educational",
+};
+const AMENITY_LABELS = {
+  wheelchair_accessible: "♿ Wheelchair Accessible",
+  gender_neutral_restroom: "🚻 Gender-Neutral Restroom",
+  sensory_friendly: "🔇 Sensory Friendly",
+  dog_friendly: "🐕 Dog Friendly",
+  wifi: "📶 Wi-Fi",
+};
+
+function PreviewBanner({ onClose, onPublish, saving, publishLabel = "Publish", publishError }) {
+  return (
+    <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+      <span className="text-sm font-semibold text-amber-700">Preview — not yet published</span>
+      <div className="flex items-center gap-3">
+        {publishError && (
+          <span className="text-sm text-red-600 font-medium">{publishError}</span>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          <ArrowLeft size={14} /> Back to Editing
+        </button>
+        <button
+          type="button"
+          onClick={onPublish}
+          disabled={saving}
+          className="px-5 py-2 rounded-full bg-[#9FB366] hover:bg-[#8a9c57] text-white font-semibold text-sm transition-colors disabled:opacity-60"
+        >
+          {saving ? "Publishing…" : publishLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EventPreviewModal({ form, imagePreviews, onClose, onPublish, saving, publishError }) {
+  const timeStr =
+    form.timeStart && form.timeEnd
+      ? `${fmt12(form.timeStart)} – ${fmt12(form.timeEnd)}`
+      : form.timeStart ? fmt12(form.timeStart) : "TBD";
+
+  const costLabel =
+    form.cost === "suggested_donation"
+      ? "Fundraiser"
+      : form.cost_amount
+        ? `${PREVIEW_COST_LABEL[form.cost]} · $${form.cost_amount}`
+        : PREVIEW_COST_LABEL[form.cost] ?? "Free";
+
+  const tags = form.tagsInput
+    ? form.tagsInput.split(",").map((t) => t.trim()).filter(Boolean)
+    : [];
+
+  const galleryImages = imagePreviews.length > 0
+    ? imagePreviews.map((url) => ({ url, alt: form.title || "Event" }))
+    : [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden" style={{ background: "rgba(0,0,0,0.55)" }}>
+      <PreviewBanner onClose={onClose} onPublish={onPublish} saving={saving} publishLabel="Publish" publishError={publishError} />
+      <div className="flex-1 overflow-y-auto bg-gray-50 pb-16">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
+            <div className="relative flex-1 min-w-0 pt-6">
+              <div className="bg-[#F5F0E8] rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-6 pb-4">
+                  <h1 className="text-3xl font-bold text-gray-900 leading-tight mb-3">
+                    {form.title || <span className="text-gray-400 italic">No title yet</span>}
+                  </h1>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium px-3 py-1 rounded-full border border-green-300 text-green-700">{costLabel}</span>
+                    <span className="text-sm font-medium px-3 py-1 rounded-full border border-green-300 text-green-700">
+                      {PREVIEW_CATEGORY_LABELS[form.category] ?? form.category}
+                    </span>
+                    {tags.slice(0, 2).map((tag) => (
+                      <span key={tag} className="text-sm font-medium px-3 py-1 rounded-full border border-green-300 text-green-700 capitalize">
+                        {tag.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {galleryImages.length > 0 ? (
+                  <EventGallery images={galleryImages} title={form.title || "Event"} />
+                ) : (
+                  <div className="mx-4 mb-4 rounded-xl bg-gray-200 h-48 flex items-center justify-center">
+                    <p className="text-gray-400 text-sm">No images added</p>
+                  </div>
+                )}
+                <div className="px-6 pt-3 pb-0 flex flex-col gap-1.5">
+                  {form.date && (
+                    <div className="flex items-center gap-3 text-gray-700">
+                      <Calendar size={18} className="text-[#97BFFF] shrink-0" />
+                      <span className="font-medium">{formatPreviewDate(form.date)}&nbsp;&nbsp;{timeStr}</span>
+                    </div>
+                  )}
+                  {form.space_name && (
+                    <div className="flex items-center gap-3 text-gray-700">
+                      <MapPin size={18} className="text-[#FD858A] shrink-0" />
+                      <span className="font-medium">{form.space_name}{form.neighborhood ? `, ${form.neighborhood}` : ""}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="px-6 pt-3 pb-5">
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {form.description || <span className="text-gray-400 italic">No description added</span>}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="w-full lg:w-80 shrink-0 flex flex-col gap-4 lg:sticky lg:top-24 pt-6">
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="bg-[#5F77A5] px-6 py-5 border-b border-[#4d6592]">
+                  <h2 className="text-xl font-bold text-white">What to expect</h2>
+                </div>
+                <div className="px-6 py-5 flex flex-col gap-3 flex-1">
+                  {form.noise_level && (
+                    <p className="text-sm text-gray-700"><span className="font-semibold">Noise level: </span>{form.noise_level}</p>
+                  )}
+                  {form.accessibility?.length > 0 && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-1.5">Accessibility:</p>
+                      <AccessibilityTags tags={form.accessibility} />
+                    </div>
+                  )}
+                  {form.space_format && (
+                    <p className="text-sm text-gray-700"><span className="font-semibold">Space format: </span>{form.space_format}</p>
+                  )}
+                  {form.crowd_level != null && (
+                    <div className="mt-3">
+                      <h3 className="font-bold text-gray-900 mb-3">Crowd Level (estimated):</h3>
+                      <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-green-500 rounded-full" style={{ width: `${form.crowd_level}%` }} />
+                      </div>
+                      <p className="text-sm font-semibold text-gray-700 mt-2">{getPreviewCrowdLabel(form.crowd_level)}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex items-center gap-2">
+                  <button disabled className="flex items-center justify-center gap-1.5 flex-1 border border-gray-200 text-gray-400 font-semibold py-2.5 rounded-xl text-sm cursor-not-allowed">
+                    <Bookmark size={15} /> Save
+                  </button>
+                  <button disabled className="flex items-center justify-center gap-1.5 flex-1 border border-gray-200 text-gray-400 font-semibold py-2.5 rounded-xl text-sm cursor-not-allowed">
+                    Calendar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SpacePreviewModal({ form, imagePreviews, onClose, onPublish, saving, publishError }) {
+  const galleryImages = imagePreviews.length > 0
+    ? imagePreviews.map((url) => ({ url, alt: form.name || "Space" }))
+    : [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden" style={{ background: "rgba(0,0,0,0.55)" }}>
+      <PreviewBanner onClose={onClose} onPublish={onPublish} saving={saving} publishLabel="Publish Space" publishError={publishError} />
+      <div className="flex-1 overflow-y-auto bg-gray-50 pb-16">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
+            <div className="relative flex-1 min-w-0 pt-6">
+              <div className="bg-[#F5F0E8] rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-6 pb-4">
+                  <h1 className="text-3xl font-bold text-gray-900 leading-tight mb-3">
+                    {form.name || <span className="text-gray-400 italic">No name yet</span>}
+                  </h1>
+                  <div className="flex flex-wrap gap-2">
+                    {form.category && (
+                      <span className="text-sm font-medium px-3 py-1 rounded-full border border-green-300 text-green-700">{form.category}</span>
+                    )}
+                    {form.neighborhood && (
+                      <span className="text-sm font-medium px-3 py-1 rounded-full border border-green-300 text-green-700">{form.neighborhood}</span>
+                    )}
+                  </div>
+                </div>
+                {galleryImages.length > 0 ? (
+                  <EventGallery images={galleryImages} title={form.name || "Space"} />
+                ) : (
+                  <div className="mx-4 mb-4 rounded-xl bg-gray-200 h-48 flex items-center justify-center">
+                    <p className="text-gray-400 text-sm">No images added</p>
+                  </div>
+                )}
+                {form.address && (
+                  <div className="px-6 pt-5 flex items-center gap-3 text-gray-700">
+                    <MapPin size={18} className="text-[#FD858A] shrink-0" />
+                    <span className="font-medium">{form.address}</span>
+                  </div>
+                )}
+                {form.hours && (
+                  <div className="px-6 pt-2 flex items-center gap-3 text-gray-700">
+                    <Clock size={18} className="text-[#97BFFF] shrink-0" />
+                    <span className="font-medium">{form.hours}</span>
+                  </div>
+                )}
+                <div className="px-6 py-5">
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {form.description || <span className="text-gray-400 italic">No description added</span>}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="w-full lg:w-80 shrink-0 flex flex-col gap-4 lg:sticky lg:top-24 pt-6">
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-[#5F77A5] px-6 py-5 border-b border-[#4d6592]">
+                  <h2 className="text-xl font-bold text-white">About this Space</h2>
+                </div>
+                <div className="px-6 py-5 flex flex-col gap-3">
+                  {form.capacity && (
+                    <p className="text-sm text-gray-700"><span className="font-semibold">Capacity: </span>{form.capacity} people</p>
+                  )}
+                  {form.website && (
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <Globe size={14} className="shrink-0 text-gray-500" />
+                      <span>{form.website}</span>
+                    </div>
+                  )}
+                  {form.amenities?.length > 0 && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-2">Amenities:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {form.amenities.map((a) => (
+                          <span key={a} className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 font-medium">
+                            {AMENITY_LABELS[a] ?? a}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Create / Edit Event View ─────────────────────────────────────────────────
 
 function CreateEventView({ editingEvent, initialTemplate, templates, createdSpaces = [], onCancel, onPublish, onSaveTemplate }) {
@@ -250,6 +526,7 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
   const [templateSaved, setTemplateSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const imageInputRef = useRef(null);
   const dragIndex = useRef(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
@@ -341,8 +618,8 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
   }
 
   async function handlePublish() {
-    if (!form.title.trim()) { setPublishError("Please add an event title before publishing."); return; }
-    if (!form.date) { setPublishError("Please select a date for your event."); return; }
+    if (!form.title.trim()) { setPublishError("Please add an event title before publishing."); return false; }
+    if (!form.date) { setPublishError("Please select a date for your event."); return false; }
     setPublishError("");
     setSaving(true);
     setSaveSuccess(false);
@@ -410,8 +687,10 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
       });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
+      return true;
     } catch (err) {
       setPublishError(err.message ?? "Failed to save — please try again.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -700,7 +979,7 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   placeholder="Write your event description here…"
-                  rows={4}
+                  rows={7}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 resize-none outline-none focus:ring-2 focus:ring-green-500 leading-relaxed"
                 />
                 <p className="text-gray-400 text-xs mt-1.5">Recommended: 2–4 short sentences</p>
@@ -987,6 +1266,13 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
         </button>
         <button
           type="button"
+          onClick={() => setShowPreview(true)}
+          className="px-8 py-2.5 rounded-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-sm transition-colors flex items-center gap-2"
+        >
+          <Eye size={14} /> Preview
+        </button>
+        <button
+          type="button"
           onClick={handlePublish}
           disabled={saving}
           className={`px-8 py-2.5 rounded-full font-semibold text-sm transition-colors disabled:opacity-60 ${
@@ -998,6 +1284,20 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
           {saving ? "Saving…" : saveSuccess ? "✓ Saved!" : isEditing ? "Save Changes" : "Publish"}
         </button>
       </div>
+
+      {showPreview && (
+        <EventPreviewModal
+          form={form}
+          imagePreviews={imagePreviews}
+          onClose={() => setShowPreview(false)}
+          onPublish={async () => {
+            const ok = await handlePublish();
+            if (ok) setShowPreview(false);
+          }}
+          saving={saving}
+          publishError={publishError}
+        />
+      )}
     </div>
   );
 }
@@ -1413,14 +1713,21 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
     return [];
   });
   const [publishError, setPublishError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const imageInputRef = useRef(null);
   const dragIndex = useRef(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
+  const imageFilesMap = useRef(new Map());
 
   function handleImageUpload(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    const urls = files.map((f) => URL.createObjectURL(f));
+    const urls = files.map((f) => {
+      const url = URL.createObjectURL(f);
+      imageFilesMap.current.set(url, f);
+      return url;
+    });
     setImagePreviews((prev) => [...prev, ...urls]);
   }
 
@@ -1448,29 +1755,57 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
     setDragOverIdx(null);
   }
 
-  function handlePublish() {
-    if (!form.name.trim()) { setPublishError("Please add a space name before publishing."); return; }
+  async function handlePublish() {
+    if (!form.name.trim()) { setPublishError("Please add a space name before publishing."); return false; }
     setPublishError("");
+    setSaving(true);
     const base = isEditing ? editingSpace : {};
-    onPublish({
-      ...base,
-      id: isEditing ? editingSpace.id : `space-custom-${Date.now()}`,
-      name: form.name.trim(),
-      address: form.address,
-      neighborhood: form.neighborhood,
-      category: form.category,
-      description: form.description,
-      hours: form.hours,
-      capacity: form.capacity ? parseInt(form.capacity) : null,
-      website: form.website,
-      amenities: form.amenities,
-      image_url: imagePreviews[0] || (isEditing ? editingSpace.image_url : `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`),
-      gallery_images: imagePreviews.length > 0
-        ? imagePreviews.map((url) => ({ url, alt: form.name }))
-        : (isEditing ? editingSpace.gallery_images : []),
-      noise_level: base.noise_level || "",
-      space_format: base.space_format || "",
-    });
+    const spaceId = isEditing ? editingSpace.id : crypto.randomUUID();
+
+    try {
+      const resolvedPreviews = await Promise.all(
+        imagePreviews.map(async (url) => {
+          if (!url.startsWith("blob:")) return url;
+          const file = imageFilesMap.current.get(url);
+          if (!file) return url;
+          try {
+            return await uploadSpaceImage(file, spaceId);
+          } catch {
+            return await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.readAsDataURL(file);
+            });
+          }
+        })
+      );
+
+      await onPublish({
+        ...base,
+        id: spaceId,
+        name: form.name.trim(),
+        address: form.address,
+        neighborhood: form.neighborhood,
+        category: form.category,
+        description: form.description,
+        hours: form.hours,
+        capacity: form.capacity ? parseInt(form.capacity) : null,
+        website: form.website,
+        amenities: form.amenities,
+        image_url: resolvedPreviews[0] || (isEditing ? editingSpace.image_url : `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`),
+        gallery_images: resolvedPreviews.length > 0
+          ? resolvedPreviews.map((url) => ({ url, alt: form.name }))
+          : (isEditing ? editingSpace.gallery_images : []),
+        noise_level: base.noise_level || "",
+        space_format: base.space_format || "",
+      });
+      return true;
+    } catch (err) {
+      setPublishError(err.message ?? "Failed to save — please try again.");
+      return false;
+    } finally {
+      setSaving(false);
+    }
   }
 
   const C = "bg-white border border-gray-200 shadow-sm";
@@ -1482,7 +1817,7 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
   return (
     <div className="flex flex-col bg-stone-100" style={{ height: "calc(100vh - 64px)" }}>
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="max-w-2xl mx-auto flex flex-col gap-4">
+        <div className="max-w-4xl mx-auto flex flex-col gap-4">
 
           {/* Edit mode banner */}
           {isEditing && (
@@ -1624,8 +1959,8 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               placeholder="Write a brief description of this space…"
-              rows={4}
-              className="w-full bg-transparent text-gray-900 placeholder:text-gray-400 resize-none outline-none text-sm leading-relaxed"
+              rows={7}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 resize-none outline-none focus:ring-2 focus:ring-green-500 leading-relaxed"
             />
           </div>
 
@@ -1714,19 +2049,41 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
         </button>
         <button
           type="button"
-          onClick={handlePublish}
-          className="px-8 py-2.5 rounded-full bg-[#9FB366] hover:bg-[#8a9c57] text-white font-semibold text-sm transition-colors"
+          onClick={() => setShowPreview(true)}
+          className="px-8 py-2.5 rounded-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-sm transition-colors flex items-center gap-2"
         >
-          {isEditing ? "Save Changes" : "Publish Space"}
+          <Eye size={14} /> Preview
+        </button>
+        <button
+          type="button"
+          onClick={handlePublish}
+          disabled={saving}
+          className="px-8 py-2.5 rounded-full bg-[#9FB366] hover:bg-[#8a9c57] text-white font-semibold text-sm transition-colors disabled:opacity-60"
+        >
+          {saving ? "Saving…" : isEditing ? "Save Changes" : "Publish Space"}
         </button>
       </div>
+
+      {showPreview && (
+        <SpacePreviewModal
+          form={form}
+          imagePreviews={imagePreviews}
+          onClose={() => setShowPreview(false)}
+          onPublish={async () => {
+            const ok = await handlePublish();
+            if (ok) setShowPreview(false);
+          }}
+          saving={saving}
+          publishError={publishError}
+        />
+      )}
     </div>
   );
 }
 
 // ─── Spaces Section ───────────────────────────────────────────────────────────
 
-function SpaceCard({ space, onEdit, onDelete }) {
+function SpaceCard({ space, onEdit, onDelete, onToggleHide }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex items-center gap-4">
       <img
@@ -1740,6 +2097,15 @@ function SpaceCard({ space, onEdit, onDelete }) {
           {space.category && (
             <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
               {space.category}
+            </span>
+          )}
+          {space.hidden ? (
+            <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
+              Hidden
+            </span>
+          ) : (
+            <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+              Published
             </span>
           )}
         </div>
@@ -1762,6 +2128,18 @@ function SpaceCard({ space, onEdit, onDelete }) {
           <span className="hidden sm:inline">View</span>
         </Link>
         <button
+          onClick={() => onToggleHide(space)}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors font-medium ${
+            space.hidden
+              ? "border-[#9FB366] text-[#9FB366] hover:bg-green-50"
+              : "border-gray-200 text-gray-500 hover:bg-gray-50"
+          }`}
+          title={space.hidden ? "Show space publicly" : "Hide space from public"}
+        >
+          {space.hidden ? <Eye size={13} /> : <EyeOff size={13} />}
+          <span className="hidden sm:inline">{space.hidden ? "Show" : "Hide"}</span>
+        </button>
+        <button
           onClick={onDelete}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm transition-colors font-medium"
         >
@@ -1773,14 +2151,16 @@ function SpaceCard({ space, onEdit, onDelete }) {
   );
 }
 
-function SpacesSection({ createdSpaces, onCreateSpace, onEditSpace, onDeleteSpace }) {
+function SpacesSection({ createdSpaces, onCreateSpace, onEditSpace, onDeleteSpace, onToggleHide, isAdmin }) {
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Spaces</h2>
+          <h2 className="text-lg font-bold text-gray-900">{isAdmin ? "All Spaces" : "Spaces"}</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            {createdSpaces.length} space{createdSpaces.length !== 1 ? "s" : ""} created
+            {createdSpaces.length} space{createdSpaces.length !== 1 ? "s" : ""} {isAdmin ? "on the site" : "created"}
           </p>
         </div>
         <button
@@ -1815,9 +2195,43 @@ function SpacesSection({ createdSpaces, onCreateSpace, onEditSpace, onDeleteSpac
               key={space.id}
               space={space}
               onEdit={() => onEditSpace(space)}
-              onDelete={() => onDeleteSpace(space.id)}
+              onDelete={() => setDeleteConfirm(space)}
+              onToggleHide={onToggleHide}
             />
           ))}
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={22} className="text-red-600" />
+            </div>
+            <h3 className="font-bold text-gray-900 text-lg text-center mb-1">Delete Space?</h3>
+            <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed">
+              <span className="font-semibold text-gray-700">"{deleteConfirm.name}"</span> will be
+              permanently removed. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  onDeleteSpace(deleteConfirm.id);
+                  setDeleteConfirm(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1836,7 +2250,7 @@ const NAV_SECTIONS = [
 ];
 
 export default function HostTools() {
-  const { user, setUser, authLoading, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, replaceCreatedEvent, deleteEvent, updateEvent, hiddenEventIds, hideEvent, showEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, deleteCreatedSpace, updateCreatedSpace, hostTemplates, addHostTemplate } = useUser();
+  const { user, setUser, authLoading, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, replaceCreatedEvent, deleteEvent, updateEvent, hiddenEventIds, hideEvent, showEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, replaceCreatedSpace, deleteCreatedSpace, updateCreatedSpace, hostTemplates, addHostTemplate } = useUser();
   const { events: allDbEvents } = useEvents();
   const templates = [...INITIAL_TEMPLATES, ...hostTemplates];
   const navigate = useNavigate();
@@ -1946,20 +2360,57 @@ export default function HostTools() {
     return filtered.map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e));
   }, [createdEvents, deletedEventIds, editedEvents]);
 
-  function handlePublishSpace(spaceData) {
+  async function handlePublishSpace(spaceData) {
+    // Preserve original host_id when admin edits another host's space
+    const hostId = editingSpace?.host_id ?? user.id;
+    const payload = { ...spaceData, host_id: hostId };
     if (editingSpace) {
       updateCreatedSpace(editingSpace.id, spaceData);
+      await updateSpaceInDB(editingSpace.id, payload);
     } else {
+      const tempId = spaceData.id;
       addCreatedSpace(spaceData);
+      try {
+        const dbSpace = await createSpaceInDB(payload);
+        if (dbSpace && dbSpace.id !== tempId) {
+          replaceCreatedSpace(tempId, { ...spaceData, ...dbSpace });
+        }
+      } catch (err) {
+        deleteCreatedSpace(tempId);
+        throw err;
+      }
     }
     setCreateSpaceOpen(false);
     setEditingSpace(null);
     setActiveSection("spaces");
   }
 
+  function handleToggleHideSpace(space) {
+    const next = !space.hidden;
+    updateCreatedSpace(space.id, { ...space, hidden: next });
+    setSpaceHiddenInDB(space.id, next)
+      .then(() => {
+        setHideToast({ message: next ? "Space hidden from public" : "Space is now visible", ok: true });
+        setTimeout(() => setHideToast(null), 3000);
+      })
+      .catch((err) => {
+        updateCreatedSpace(space.id, { ...space, hidden: !next });
+        setHideToast({ message: "Failed to update visibility — check your connection", ok: false });
+        setTimeout(() => setHideToast(null), 4000);
+        console.warn("Failed to persist space visibility change:", err.message);
+      });
+  }
+
   function handleEditSpace(space) {
     setEditingSpace(space);
     setCreateSpaceOpen(true);
+  }
+
+  function handleDeleteSpace(id) {
+    deleteCreatedSpace(id);
+    deleteSpaceInDB(id).catch((err) =>
+      console.warn("Failed to delete space from DB:", err.message),
+    );
   }
 
   if (createSpaceOpen) {
@@ -2114,7 +2565,9 @@ export default function HostTools() {
                 createdSpaces={createdSpaces}
                 onCreateSpace={() => { setEditingSpace(null); setCreateSpaceOpen(true); }}
                 onEditSpace={handleEditSpace}
-                onDeleteSpace={deleteCreatedSpace}
+                onDeleteSpace={handleDeleteSpace}
+                onToggleHide={handleToggleHideSpace}
+                isAdmin={user.role === "admin"}
               />
             )}
             {activeSection === "events" && (
