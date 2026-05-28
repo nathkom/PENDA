@@ -21,7 +21,9 @@ export async function upsertTemplate(tpl) {
         category:    tpl.category,
         description: tpl.description,
         prefill:     tpl.prefill ?? {},
-        last_edited: tpl.lastEdited ?? "",
+        last_edited: tpl.last_edited ?? tpl.lastEdited ?? "",
+        image:       tpl.image ?? null,
+        images:      tpl.images ?? [],
       },
       { onConflict: "id" }
     )

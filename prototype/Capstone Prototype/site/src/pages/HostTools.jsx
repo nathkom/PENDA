@@ -631,22 +631,27 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
   async function handleSaveTemplate() {
     const name = form.title.trim() || "Untitled Template";
     const tags = form.tagsInput ? form.tagsInput.split(",").map((t) => t.trim()).filter(Boolean) : [];
+    const templateId = crypto.randomUUID();
 
-    const toBase64 = (url) => {
-      if (!url.startsWith("blob:")) return Promise.resolve(url);
-      return fetch(url)
-        .then((r) => r.blob())
-        .then((blob) => new Promise((res) => {
+    const resolveImage = async (url) => {
+      if (!url.startsWith("blob:")) return url;
+      const file = imageFilesMap.current.get(url);
+      if (!file) return url;
+      try {
+        return await uploadEventImage(file, `template-${templateId}`);
+      } catch {
+        return await new Promise((resolve) => {
           const reader = new FileReader();
-          reader.onload = () => res(reader.result);
-          reader.readAsDataURL(blob);
-        }));
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(file);
+        });
+      }
     };
-    const images = await Promise.all(imagePreviews.map(toBase64));
+    const images = await Promise.all(imagePreviews.map(resolveImage));
 
     const lastEdited = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     onSaveTemplate({
-      id: crypto.randomUUID(),
+      id: templateId,
       name,
       category: form.category,
       description: (form.description || "").slice(0, 90) + (form.description.length > 90 ? "…" : ""),
