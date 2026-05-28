@@ -4,7 +4,7 @@ import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useUser } from "../context/UserContext";
 
 export default function SignIn() {
-  const { signIn, setUser } = useUser();
+  const { signIn } = useUser();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -143,45 +143,6 @@ export default function SignIn() {
               {loading ? "Signing in…" : "Sign In"}
             </button>
           </form>
-
-          {/* Demo access */}
-          <div className="mt-5 flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-gray-200" />
-              <span className="text-xs text-gray-400 font-medium">
-                Demo Accounts
-              </span>
-              <div className="flex-1 h-px bg-gray-200" />
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setUser({
-                  name: "Joshua Acevedo",
-                  email: "host@demo.com",
-                  role: "host",
-                });
-                navigate("/host");
-              }}
-              className="w-full bg-[#5F77A5] hover:bg-[#4d6592] text-white font-semibold py-2.5 rounded-xl transition-colors"
-            >
-              Demo Host
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setUser({
-                  name: "Demo User",
-                  email: "user@demo.com",
-                  role: "user",
-                });
-                navigate("/");
-              }}
-              className="w-full bg-[#5F77A5] hover:bg-[#4d6592] text-white font-semibold py-2.5 rounded-xl transition-colors"
-            >
-              Demo User
-            </button>
-          </div>
         </div>
 
         {/* Sign up prompt */}

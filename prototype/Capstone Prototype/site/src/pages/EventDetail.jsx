@@ -7,12 +7,14 @@ import {
   Bookmark,
   CalendarPlus,
   Share2,
+  Download,
+  Check,
 } from "lucide-react";
 import { spaces as staticSpaces } from "../data/spaces";
 import paperclipImg from "../../wireframes/Paperclip.png";
 import headerBg from "../../wireframes/headerbackground1.png";
 import thumbtackImg from "../../wireframes/thumbtack.png";
-import EventCard from "../components/EventCard";
+import EventCard, { useEventActions, googleCalUrl, downloadIcs, CopiedToast } from "../components/EventCard";
 import EventGallery from "../components/EventGallery";
 import AccessibilityTags from "../components/AccessibilityTags";
 import { useUser } from "../context/UserContext";
@@ -91,6 +93,8 @@ export default function EventDetail() {
       .filter((e) => e.space_name === event.space_name && e.id !== event.id)
       .slice(0, 3);
   }, [allEvents, event]);
+
+  const { calOpen, setCalOpen, calRef, copied, handleShare } = useEventActions(event ?? { id: "" });
 
   const [likedEvents, setLikedEvents] = useState(() => {
     const saved = localStorage.getItem("likedEvents");
@@ -176,6 +180,7 @@ export default function EventDetail() {
 
   return (
     <main className="bg-gray-50 min-h-screen pb-16">
+      <CopiedToast visible={copied} />
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Back button */}
         <button
@@ -372,18 +377,68 @@ export default function EventDetail() {
                     <Bookmark size={15} />
                     {bookmarkedEvents.has(event.id) ? "Saved" : "Save"}
                   </button>
+                  <div ref={calRef} className="relative flex-1">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); setCalOpen((o) => !o); }}
+                      className={`w-full flex items-center justify-center gap-1.5 border font-semibold py-2.5 rounded-xl text-sm transition-colors ${
+                        calOpen
+                          ? "border-[#9FB366] bg-green-50 text-[#9FB366]"
+                          : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-700"
+                      }`}
+                      aria-label="Add to calendar"
+                    >
+                      <CalendarPlus size={15} />
+                      Calendar
+                    </button>
+                    {calOpen && (
+                      <div className="absolute bottom-full left-0 mb-1.5 w-48 bg-white rounded-xl border border-gray-200 shadow-lg z-50 overflow-hidden">
+                        <p className="px-3.5 pt-2.5 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+                          Add to calendar
+                        </p>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(googleCalUrl(event), "_blank", "noopener,noreferrer"); setCalOpen(false); }}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <img
+                            src="https://www.google.com/favicon.ico"
+                            alt=""
+                            className="w-3.5 h-3.5 rounded-sm"
+                            onError={(e) => { e.target.style.display = "none"; }}
+                          />
+                          Google Calendar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); downloadIcs(event); setCalOpen(false); }}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <Download size={13} className="text-gray-400 shrink-0" />
+                          Apple Calendar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); downloadIcs(event); setCalOpen(false); }}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2 pb-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <Download size={13} className="text-gray-400 shrink-0" />
+                          Outlook
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button
-                    className="flex items-center justify-center gap-1.5 flex-1 border border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition-colors"
-                    aria-label="Add to calendar"
-                  >
-                    <CalendarPlus size={15} />
-                    Calendar
-                  </button>
-                  <button
-                    className="border border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-700 p-2.5 rounded-xl transition-colors"
+                    type="button"
+                    onClick={handleShare}
+                    className={`border p-2.5 rounded-xl transition-colors ${
+                      copied
+                        ? "border-[#9FB366] bg-green-50 text-[#9FB366]"
+                        : "border-gray-200 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-700"
+                    }`}
                     aria-label="Share this event"
                   >
-                    <Share2 size={15} />
+                    {copied ? <Check size={15} /> : <Share2 size={15} />}
                   </button>
                 </div>
               </div>

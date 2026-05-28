@@ -4,12 +4,11 @@ import {
   User, FileText, Calendar, Camera, Building2, Mail, Lock,
   Globe, Plus, Edit2, Eye, EyeOff, ChevronRight,
   Upload, MapPin, X, Check, Trash2, Bookmark, CalendarCheck, Users, BarChart3,
-  ArrowLeft, Clock,
+  ArrowLeft, Clock, Search,
 } from "lucide-react";
 import EventGallery from "../components/EventGallery";
 import AccessibilityTags from "../components/AccessibilityTags";
 import { useUser } from "../context/UserContext";
-import { events as staticEvents } from "../data/events";
 import { NEIGHBORHOODS } from "../utils/filters";
 import {
   createEvent as createEventInDB,
@@ -28,6 +27,7 @@ import {
 import { useEvents } from "../hooks/useEvents";
 import BookmarkedEventsSection from "../components/BookmarkedEventsSection";
 import AttendingEventsSection from "../components/AttendingEventsSection";
+import thumbtackImg from "../../wireframes/thumbtack.png";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -140,6 +140,47 @@ const CATEGORY_COLORS = {
   sports: "bg-red-100 text-red-700",
   educational: "bg-yellow-100 text-yellow-700",
 };
+
+const COST_BADGE = {
+  free: "bg-green-100 text-green-700",
+  suggested_donation: "bg-yellow-100 text-yellow-700",
+  paid: "bg-gray-100 text-gray-600",
+};
+
+const COST_LABEL = {
+  free: "Free",
+  suggested_donation: "Fundraiser",
+  paid: "Paid",
+};
+
+const SPACE_CATEGORY_BADGE = {
+  "Café":             "bg-amber-100 text-amber-700",
+  "Park":             "bg-green-100 text-green-700",
+  "Gallery":          "bg-purple-100 text-purple-700",
+  "Community Center": "bg-blue-100 text-blue-700",
+  "Library":          "bg-indigo-100 text-indigo-700",
+  "Brewery":          "bg-orange-100 text-orange-700",
+  "Other":            "bg-gray-100 text-gray-600",
+};
+
+const CARD_AMENITY_LABELS = {
+  wheelchair_accessible:   "Accessible",
+  gender_neutral_restroom: "Gender-neutral restrooms",
+  sensory_friendly:        "Sensory-friendly",
+  dog_friendly:            "Dog-friendly",
+  wifi:                    "WiFi",
+};
+
+function formatCardDate(dateStr) {
+  if (!dateStr) return "";
+  const [year, month, day] = dateStr.split("-").map(Number);
+  if (!year || !month || !day) return dateStr;
+  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 const CATEGORY_TO_IMAGE = {
   social: `${import.meta.env.BASE_URL}images/rizky-subagja-1k7TnX5GAww-unsplash.jpg`,
@@ -603,12 +644,14 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
     };
     const images = await Promise.all(imagePreviews.map(toBase64));
 
+    const lastEdited = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     onSaveTemplate({
-      id: `tpl-${Date.now()}`,
+      id: crypto.randomUUID(),
       name,
       category: form.category,
       description: (form.description || "").slice(0, 90) + (form.description.length > 90 ? "…" : ""),
-      lastEdited: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      lastEdited,
+      last_edited: lastEdited,
       image: images[0] || null,
       images,
       prefill: { ...form, tags },
@@ -674,7 +717,7 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
         gallery_images: resolvedPreviews.length > 0
           ? resolvedPreviews.map((url) => ({ url, alt: form.title }))
           : (isEditing ? editingEvent.gallery_images : []),
-        contact_email: base.contact_email || "host@demo.com",
+        contact_email: base.contact_email || "",
         featured: base.featured ?? false,
         noise_level: form.noise_level || "Community-friendly",
         accessibility_info: form.accessibility_info || "Welcoming to all, no barriers",
@@ -745,12 +788,16 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
                 </div>
               ))}
 
-              {templates.length > 0 && (
+              {(() => {
+                const initialIds = new Set(INITIAL_TEMPLATES.map((t) => t.id));
+                const ownedTemplates = templates.filter((t) => !initialIds.has(t.id));
+                if (ownedTemplates.length === 0) return null;
+                return (
                 <div className="border-t border-gray-100 pt-4 mt-1">
                   <p className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3 px-0.5">
                     Your Templates
                   </p>
-                  {templates.map((tpl) => (
+                  {ownedTemplates.map((tpl) => (
                     <div key={tpl.id} onClick={() => applyUserTemplate(tpl)} className="cursor-pointer group mb-4">
                       <div className="relative rounded-xl overflow-hidden" style={{ aspectRatio: "4/3" }}>
                         <img
@@ -774,7 +821,8 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
                     </div>
                   ))}
                 </div>
-              )}
+                );
+              })()}
             </div>
           </div>{/* end inner 460px wrapper */}
         </div>{/* end animated panel */}
@@ -1471,164 +1519,330 @@ function ProfileSection({ user, setUser }) {
   );
 }
 
-// ─── Templates Section ────────────────────────────────────────────────────────
+// ─── Edit Template Modal ──────────────────────────────────────────────────────
 
-function TemplatesSection({ templates, onCreateTemplate, onUseTemplate }) {
+const ACCESSIBILITY_OPTS = [
+  { id: "wheelchair_accessible",  label: "♿ Wheelchair Accessible" },
+  { id: "gender_neutral_restroom", label: "🚻 Gender-Neutral Restroom" },
+  { id: "sensory_friendly",       label: "🔇 Sensory Friendly" },
+  { id: "dog_friendly",           label: "🐕 Dog Friendly" },
+];
+
+function EditTemplateModal({ template, saveError, onSave, onDelete, onCancel }) {
+  const [name, setName] = useState(template.name);
+  const [category, setCategory] = useState(template.category);
+  const [description, setDescription] = useState(template.description);
+  const [prefill, setPrefill] = useState({
+    noise_level:      "",
+    space_format:     "",
+    accessibility_info: "",
+    crowd_level_label: "",
+    crowd_level:       50,
+    cost:              "free",
+    cost_amount:       null,
+    accessibility:     [],
+    tagsInput:         "",
+    ...template.prefill,
+  });
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  function setPf(key, value) {
+    setPrefill((p) => ({ ...p, [key]: value }));
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setSaving(true);
+    const lastEdited = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    await onSave({ name: name.trim(), category, description, prefill, last_edited: lastEdited, lastEdited });
+    setSaving(false);
+  }
+
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">Event Templates</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Save time by reusing preset event configurations</p>
+    <div className="fixed inset-0 z-[300] bg-black/50 flex items-center justify-center p-4" onClick={onCancel}>
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-900">Edit Template</h2>
+          <button onClick={onCancel} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <X size={18} className="text-gray-500" />
+          </button>
         </div>
-        <button
-          onClick={onCreateTemplate}
-          className="flex items-center gap-2 bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
-        >
-          <Plus size={14} />
-          New Template
-        </button>
-      </div>
 
-      <div className="flex flex-col gap-3">
-        {templates.map((tpl) => (
-          <div key={tpl.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0">
-              <FileText size={18} className="text-green-700" />
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5 p-6">
+          {/* Name */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-gray-700">Template Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
+              required
+            />
+          </div>
+
+          {/* Category + Description */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-gray-700">Category</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="social">Social</option>
+                <option value="arts">Arts</option>
+                <option value="outdoors">Outdoors</option>
+                <option value="food">Food</option>
+                <option value="sports">Sports</option>
+                <option value="educational">Educational</option>
+              </select>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h3 className="font-semibold text-gray-900 text-sm">{tpl.name}</h3>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${CATEGORY_COLORS[tpl.category] || "bg-gray-100 text-gray-600"}`}>
-                  {tpl.category}
-                </span>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-gray-700">Cost Default</label>
+              <select
+                value={prefill.cost}
+                onChange={(e) => setPf("cost", e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="free">Free</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
+          </div>
+
+          {prefill.cost === "paid" && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-gray-700">Default Price ($)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={prefill.cost_amount ?? ""}
+                onChange={(e) => setPf("cost_amount", parseFloat(e.target.value) || null)}
+                placeholder="0.00"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-gray-700">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500 resize-none"
+            />
+          </div>
+
+          <div className="border-t border-gray-100 pt-1">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Default Event Settings</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold text-gray-700">Noise Level</label>
+                <input
+                  type="text"
+                  value={prefill.noise_level}
+                  onChange={(e) => setPf("noise_level", e.target.value)}
+                  placeholder="Quiet, moderate, lively…"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
+                />
               </div>
-              <p className="text-sm text-gray-500 leading-relaxed">{tpl.description}</p>
-              <p className="text-xs text-gray-400 mt-1.5">Last edited {tpl.lastEdited}</p>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold text-gray-700">Space Format</label>
+                <input
+                  type="text"
+                  value={prefill.space_format}
+                  onChange={(e) => setPf("space_format", e.target.value)}
+                  placeholder="Workshop, open mingling…"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold text-gray-700">Accessibility Info</label>
+                <input
+                  type="text"
+                  value={prefill.accessibility_info}
+                  onChange={(e) => setPf("accessibility_info", e.target.value)}
+                  placeholder="e.g. Fully accessible…"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold text-gray-700">Attendance Level</label>
+                <select
+                  value={prefill.crowd_level_label}
+                  onChange={(e) => {
+                    const label = e.target.value;
+                    const level = label === "Small group" ? 25 : label === "Large crowd" ? 80 : 55;
+                    setPrefill((p) => ({ ...p, crowd_level_label: label, crowd_level: level }));
+                  }}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">Select…</option>
+                  <option value="Small group">Small group</option>
+                  <option value="Moderately busy">Moderately busy</option>
+                  <option value="Large crowd">Large crowd</option>
+                </select>
+              </div>
             </div>
-            <div className="flex gap-2 flex-shrink-0 self-start">
-              <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors font-medium">
-                <Edit2 size={13} /> Edit
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-gray-700">Default Tags</label>
+            <input
+              type="text"
+              value={prefill.tagsInput}
+              onChange={(e) => setPf("tagsInput", e.target.value)}
+              placeholder="drop_in, outdoor, community"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <p className="text-xs text-gray-400">Comma-separated</p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-gray-700">Default Accessibility Tags</label>
+            <div className="flex flex-wrap gap-2">
+              {ACCESSIBILITY_OPTS.map((opt) => {
+                const on = (prefill.accessibility || []).includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() =>
+                      setPf(
+                        "accessibility",
+                        on
+                          ? (prefill.accessibility || []).filter((a) => a !== opt.id)
+                          : [...(prefill.accessibility || []), opt.id]
+                      )
+                    }
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                      on
+                        ? "bg-green-700 text-white border-green-700"
+                        : "text-gray-600 border-gray-200 hover:border-green-400"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {saveError && (
+            <p className="text-sm text-red-600 font-medium">{saveError}</p>
+          )}
+
+          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+            {confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-red-600 font-medium">Delete this template?</span>
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors"
+                >
+                  Yes, delete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 font-medium transition-colors"
+              >
+                <Trash2 size={14} /> Delete template
               </button>
-              <button onClick={() => onUseTemplate(tpl)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm transition-colors font-medium">
-                Use
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !name.trim()}
+                className="px-4 py-2 rounded-xl bg-[#9FB366] hover:bg-[#8a9c57] disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+              >
+                {saving ? "Saving…" : "Save Changes"}
               </button>
             </div>
           </div>
-        ))}
-      </div>
-
-      <div className="bg-gray-50 rounded-2xl border border-dashed border-gray-300 p-6 flex flex-col items-center text-center gap-2">
-        <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
-          <Plus size={18} className="text-gray-400" />
-        </div>
-        <p className="text-sm font-semibold text-gray-700">Create a new template</p>
-        <p className="text-xs text-gray-400 max-w-xs">
-          Templates pre-fill event details so you can post new listings in seconds.
-        </p>
-        <button onClick={onCreateTemplate}
-          className="mt-1 px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium">
-          Create Template
-        </button>
+        </form>
       </div>
     </div>
   );
 }
 
-// ─── Events Section ───────────────────────────────────────────────────────────
+// ─── Templates Section ────────────────────────────────────────────────────────
 
-function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent, onToggleHide, isAdmin }) {
-  const [deleteConfirm, setDeleteConfirm] = useState(null); // event object to confirm
+function TemplatesSection({ templates, onCreateTemplate, onUseTemplate, onEditTemplate }) {
+  const initialIds = new Set(INITIAL_TEMPLATES.map((t) => t.id));
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">{isAdmin ? "All Events" : "Your Events"}</h2>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {hostEvents.length} event{hostEvents.length !== 1 ? "s" : ""} {isAdmin ? "on the site" : "posted"}
-          </p>
-        </div>
-        <button
-          onClick={onCreateEvent}
-          className="flex items-center gap-2 bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
-        >
-          <Plus size={14} />
-          Create Event
-        </button>
-      </div>
+    <div className="flex flex-col gap-6">
+      <SectionHeader
+        title="Event Templates"
+        subtitle="Save time by reusing preset event configurations"
+        action={<CreateButton onClick={onCreateTemplate} label="New Template" />}
+      />
 
       <div className="flex flex-col gap-3">
-        {hostEvents.map((event) => {
-          const d = new Date(event.date + "T00:00:00");
-          const dateStr = isNaN(d)
-            ? event.date
-            : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        {templates.map((tpl) => {
+          const isOwned = !initialIds.has(tpl.id);
           return (
-            <div key={event.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex items-center gap-4">
-              <img
-                src={event.image_url}
-                alt={event.title}
-                className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
-              />
+            <div
+              key={tpl.id}
+              className="bg-[#F5F0E8] rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5 flex items-start gap-4"
+            >
+              <div className="w-11 h-11 rounded-xl bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
+                <FileText size={18} className="text-[#9FB366]" />
+              </div>
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                  <h3 className="font-semibold text-gray-900 text-sm truncate">{event.title}</h3>
-                  {event.hidden ? (
-                    <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
-                      Hidden
-                    </span>
-                  ) : (
-                    <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
-                      Published
-                    </span>
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <h3 className="font-bold text-gray-900 text-base leading-tight">{tpl.name}</h3>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${CATEGORY_COLORS[tpl.category] || "bg-gray-100 text-gray-600"}`}>
+                    {tpl.category}
+                  </span>
+                  {!isOwned && (
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">Preset</span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 truncate">{event.space_name} · {event.neighborhood}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{dateStr} · {event.time}</p>
-                {event.attending_count != null && (
-                  <div className="flex items-center gap-1 mt-1.5">
-                    <Users size={11} className="text-[#9FB366] flex-shrink-0" />
-                    <span className="text-xs font-medium text-[#7a9147]">
-                      {event.attending_count} planning to attend
-                    </span>
-                  </div>
-                )}
+                <p className="text-sm text-gray-600 leading-relaxed">{tpl.description}</p>
+                <p className="text-xs text-gray-400 mt-1.5">Last edited {tpl.last_edited || tpl.lastEdited}</p>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex gap-1.5 flex-shrink-0 self-start">
+                {isOwned && (
+                  <button
+                    onClick={() => onEditTemplate(tpl)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-400 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-600 text-sm font-medium transition-colors"
+                  >
+                    Edit
+                    <Edit2 size={14} />
+                  </button>
+                )}
                 <button
-                  onClick={() => onEditEvent(event)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                  onClick={() => onUseTemplate(tpl)}
+                  className="px-4 py-2 rounded-lg bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm font-semibold transition-colors"
                 >
-                  <Edit2 size={13} />
-                  <span className="hidden sm:inline">Edit</span>
-                </button>
-                <Link
-                  to={`/events/${event.id}`}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition-colors font-medium"
-                >
-                  <Eye size={13} />
-                  <span className="hidden sm:inline">View</span>
-                </Link>
-                <button
-                  onClick={() => onToggleHide(event)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors font-medium ${
-                    event.hidden
-                      ? "border-[#9FB366] text-[#9FB366] hover:bg-green-50"
-                      : "border-gray-200 text-gray-500 hover:bg-gray-50"
-                  }`}
-                  title={event.hidden ? "Show event publicly" : "Hide event from public"}
-                >
-                  {event.hidden ? <Eye size={13} /> : <EyeOff size={13} />}
-                  <span className="hidden sm:inline">{event.hidden ? "Show" : "Hide"}</span>
-                </button>
-                <button
-                  onClick={() => setDeleteConfirm(event)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm transition-colors font-medium"
-                >
-                  <Trash2 size={13} />
-                  <span className="hidden sm:inline">Delete</span>
+                  Use
                 </button>
               </div>
             </div>
@@ -1636,37 +1850,350 @@ function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent, 
         })}
       </div>
 
-      {/* Delete confirmation modal */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-              <Trash2 size={22} className="text-red-600" />
+      <EmptyHostState
+        icon={Plus}
+        title="Create a new template"
+        body="Templates pre-fill event details so you can post new listings in seconds."
+        ctaLabel="Create Template"
+        onCta={onCreateTemplate}
+      />
+    </div>
+  );
+}
+
+// ─── Shared Host UI Primitives ────────────────────────────────────────────────
+
+function HostActionButtons({ viewHref, onEdit, onToggleHide, hidden, onDelete }) {
+  const baseCls =
+    "flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors";
+  return (
+    <div className="flex gap-1.5 shrink-0">
+      <button
+        type="button"
+        onClick={onEdit}
+        className={`${baseCls} border-gray-400 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-600`}
+      >
+        Edit
+        <Edit2 size={14} />
+      </button>
+      <Link
+        to={viewHref}
+        className={`${baseCls} border-gray-400 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-600`}
+      >
+        View
+        <Eye size={14} />
+      </Link>
+      <button
+        type="button"
+        onClick={onToggleHide}
+        className={`${baseCls} ${
+          hidden
+            ? "border-[#9FB366] text-[#9FB366] bg-green-50"
+            : "border-gray-400 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-600"
+        }`}
+      >
+        {hidden ? "Show" : "Hide"}
+        {hidden ? <Eye size={14} /> : <EyeOff size={14} />}
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        className={`${baseCls} border-red-300 text-red-500 hover:bg-red-50`}
+      >
+        Delete
+        <Trash2 size={14} />
+      </button>
+    </div>
+  );
+}
+
+function DeleteConfirmModal({ title, body, onCancel, onConfirm }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+        <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+          <Trash2 size={22} className="text-red-600" />
+        </div>
+        <h3 className="font-bold text-gray-900 text-lg text-center mb-1">{title}</h3>
+        <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed">{body}</p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({ title, subtitle, action }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+        <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function CreateButton({ onClick, label }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
+    >
+      <Plus size={14} />
+      {label}
+    </button>
+  );
+}
+
+function HostSearchBar({ value, onChange, placeholder }) {
+  return (
+    <div className="relative">
+      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-10 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-[#9FB366] focus:ring-2 focus:ring-[#9FB366]/20 transition-colors"
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+          aria-label="Clear search"
+        >
+          <X size={14} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EmptyHostState({ icon: Icon, title, body, ctaLabel, onCta }) {
+  return (
+    <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-10 flex flex-col items-center text-center gap-2">
+      <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center">
+        <Icon size={20} className="text-gray-400" />
+      </div>
+      <p className="text-sm font-semibold text-gray-700 mt-1">{title}</p>
+      <p className="text-xs text-gray-400 max-w-xs">{body}</p>
+      {ctaLabel && (
+        <button
+          onClick={onCta}
+          className="mt-2 px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+        >
+          {ctaLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Events Section ───────────────────────────────────────────────────────────
+
+function HostEventCard({ event, onEdit, onToggleHide, onDelete }) {
+  const costCls = COST_BADGE[event.cost] || "bg-gray-100 text-gray-600";
+  const costLbl = COST_LABEL[event.cost] || "Free";
+  const dateStr = formatCardDate(event.date);
+
+  return (
+    <div className="relative">
+      <div
+        className={`bg-[#F5F0E8] rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow h-[220px] ${
+          event.hidden ? "opacity-70" : ""
+        }`}
+      >
+        <div className="flex h-full">
+          {/* Image */}
+          <div className="w-52 shrink-0 overflow-hidden">
+            <img
+              src={event.image_url}
+              alt={event.title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 p-4 flex flex-col min-w-0 overflow-hidden gap-1.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <h3 className="text-lg font-bold text-gray-900 leading-tight line-clamp-1 min-w-0 flex-1">
+                {event.title}
+              </h3>
+              {event.hidden ? (
+                <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 font-medium">
+                  Hidden
+                </span>
+              ) : (
+                <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+                  Published
+                </span>
+              )}
             </div>
-            <h3 className="font-bold text-gray-900 text-lg text-center mb-1">Delete Event?</h3>
-            <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed">
-              <span className="font-semibold text-gray-700">"{deleteConfirm.title}"</span> will be
-              permanently removed from your catalog. This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  onDeleteEvent(deleteConfirm.id);
-                  setDeleteConfirm(null);
-                }}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors"
-              >
-                Delete
-              </button>
+
+            {/* Meta — same icon colours as the public FeedCard */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+              {event.date && (
+                <span className="flex items-center gap-1">
+                  <Calendar size={11} className="text-[#97BFFF] shrink-0" />
+                  {dateStr}
+                </span>
+              )}
+              {event.time && (
+                <span className="flex items-center gap-1">
+                  <Clock size={11} className="text-[#FFA86C] shrink-0" />
+                  {event.time}
+                </span>
+              )}
+              {event.space_name && (
+                <span className="flex items-center gap-1 truncate">
+                  <MapPin size={11} className="text-[#FD858A] shrink-0" />
+                  <span className="truncate">{event.space_name}, Seattle</span>
+                </span>
+              )}
+              {event.attending_count != null && (
+                <span className="flex items-center gap-1">
+                  <Users size={11} className="text-[#9FB366] shrink-0" />
+                  {event.attending_count} attending
+                </span>
+              )}
+            </div>
+
+            {event.description && (
+              <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
+                {event.description}
+              </p>
+            )}
+
+            {/* Tags + host actions — same position as FeedCard's tags + actions */}
+            <div className="flex items-center justify-between mt-auto gap-2">
+              <div className="flex flex-wrap gap-1 min-w-0 overflow-hidden">
+                <span className={`text-sm px-3 py-1 rounded-full font-semibold ${costCls}`}>
+                  {costLbl}
+                </span>
+                {event.tags?.slice(0, 2).map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-sm px-3 py-1 rounded-full border border-green-300 text-green-700 capitalize whitespace-nowrap"
+                  >
+                    {tag.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+
+              <HostActionButtons
+                viewHref={`/events/${event.id}`}
+                onEdit={onEdit}
+                onToggleHide={onToggleHide}
+                hidden={event.hidden}
+                onDelete={onDelete}
+              />
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Thumbtack — same position as FeedCard */}
+      <img
+        src={thumbtackImg}
+        alt=""
+        aria-hidden="true"
+        className="absolute -top-6 -right-3 w-[80px] pointer-events-none select-none z-10 rotate-12"
+      />
+    </div>
+  );
+}
+
+function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent, onToggleHide, isAdmin }) {
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [query, setQuery] = useState("");
+
+  const filteredEvents = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return hostEvents;
+    return hostEvents.filter((e) => {
+      const hay = [
+        e.title, e.space_name, e.neighborhood, e.category, e.description,
+        ...(e.tags || []),
+      ].filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }, [hostEvents, query]);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <SectionHeader
+        title={isAdmin ? "All Events" : "Your Events"}
+        subtitle={`${hostEvents.length} event${hostEvents.length !== 1 ? "s" : ""} ${isAdmin ? "on the site" : "posted"}`}
+        action={<CreateButton onClick={onCreateEvent} label="Create Event" />}
+      />
+
+      {hostEvents.length > 0 && (
+        <HostSearchBar
+          value={query}
+          onChange={setQuery}
+          placeholder="Search your events by title, space, neighborhood, or tag…"
+        />
+      )}
+
+      {hostEvents.length === 0 ? (
+        <EmptyHostState
+          icon={Calendar}
+          title="No events yet"
+          body="Post your first event to start showing up in the public catalog."
+          ctaLabel="Create Event"
+          onCta={onCreateEvent}
+        />
+      ) : filteredEvents.length === 0 ? (
+        <EmptyHostState
+          icon={Search}
+          title="No matches"
+          body={`Nothing matches "${query}". Try a different keyword or clear the search.`}
+        />
+      ) : (
+        <div className="flex flex-col gap-6">
+          {filteredEvents.map((event) => (
+            <HostEventCard
+              key={event.id}
+              event={event}
+              onEdit={() => onEditEvent(event)}
+              onToggleHide={() => onToggleHide(event)}
+              onDelete={() => setDeleteConfirm(event)}
+            />
+          ))}
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <DeleteConfirmModal
+          title="Delete Event?"
+          body={
+            <>
+              <span className="font-semibold text-gray-700">"{deleteConfirm.title}"</span> will be
+              permanently removed from your catalog. This cannot be undone.
+            </>
+          }
+          onCancel={() => setDeleteConfirm(null)}
+          onConfirm={() => {
+            onDeleteEvent(deleteConfirm.id);
+            setDeleteConfirm(null);
+          }}
+        />
       )}
     </div>
   );
@@ -2084,113 +2611,161 @@ function CreateSpaceView({ editingSpace, onCancel, onPublish }) {
 // ─── Spaces Section ───────────────────────────────────────────────────────────
 
 function SpaceCard({ space, onEdit, onDelete, onToggleHide }) {
+  const badgeCls = SPACE_CATEGORY_BADGE[space.category] || "bg-gray-100 text-gray-600";
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex items-center gap-4">
-      <img
-        src={space.image_url || `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`}
-        alt={space.name}
-        className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
-      />
-      <div className="flex-1 min-w-0">
-        <div className="flex flex-wrap items-center gap-2 mb-0.5">
-          <h3 className="font-semibold text-gray-900 text-sm truncate">{space.name}</h3>
-          {space.category && (
-            <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
-              {space.category}
-            </span>
-          )}
-          {space.hidden ? (
-            <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
-              Hidden
-            </span>
-          ) : (
-            <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
-              Published
-            </span>
-          )}
+    <div className="relative">
+      <div
+        className={`bg-[#F5F0E8] rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow h-[220px] ${
+          space.hidden ? "opacity-70" : ""
+        }`}
+      >
+        <div className="flex h-full">
+          {/* Image */}
+          <div className="w-52 shrink-0 overflow-hidden">
+            <img
+              src={space.image_url || `${import.meta.env.BASE_URL}images/headway-F2KRf_QfCqw-unsplash.jpg`}
+              alt={space.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 p-4 flex flex-col min-w-0 overflow-hidden gap-1.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <h3 className="text-lg font-bold text-gray-900 leading-tight line-clamp-1 min-w-0 flex-1">
+                {space.name}
+              </h3>
+              {space.hidden ? (
+                <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 font-medium">
+                  Hidden
+                </span>
+              ) : (
+                <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+                  Published
+                </span>
+              )}
+            </div>
+
+            {/* Meta — same icon colours as the homepage SpaceCard */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+              {space.neighborhood && (
+                <span className="flex items-center gap-1 truncate">
+                  <MapPin size={11} className="text-[#FD858A] shrink-0" />
+                  <span className="truncate">{space.neighborhood}, Seattle</span>
+                </span>
+              )}
+              {space.capacity && (
+                <span className="flex items-center gap-1">
+                  <Users size={11} className="text-[#97BFFF] shrink-0" />
+                  Up to {space.capacity}
+                </span>
+              )}
+              {space.hours && (
+                <span className="flex items-center gap-1 min-w-0">
+                  <Clock size={11} className="text-[#FFA86C] shrink-0" />
+                  <span className="truncate max-w-[180px]">{space.hours}</span>
+                </span>
+              )}
+            </div>
+
+            {space.description && (
+              <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">
+                {space.description}
+              </p>
+            )}
+
+            {/* Tags + host actions */}
+            <div className="flex items-center justify-between mt-auto gap-2">
+              <div className="flex flex-wrap gap-1 min-w-0 overflow-hidden">
+                {space.category && (
+                  <span className={`text-sm px-3 py-1 rounded-full font-semibold ${badgeCls}`}>
+                    {space.category}
+                  </span>
+                )}
+                {space.amenities?.slice(0, 2).map((a) => (
+                  <span
+                    key={a}
+                    className="text-sm px-3 py-1 rounded-full border border-green-300 text-green-700 capitalize whitespace-nowrap"
+                  >
+                    {CARD_AMENITY_LABELS[a] || a.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+
+              <HostActionButtons
+                viewHref={`/spaces/${space.id}`}
+                onEdit={onEdit}
+                onToggleHide={() => onToggleHide(space)}
+                hidden={space.hidden}
+                onDelete={onDelete}
+              />
+            </div>
+          </div>
         </div>
-        <p className="text-xs text-gray-500 truncate">{space.address}</p>
-        <p className="text-xs text-gray-400 mt-0.5">{space.neighborhood}</p>
       </div>
-      <div className="flex gap-2 flex-shrink-0">
-        <button
-          onClick={onEdit}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors font-medium"
-        >
-          <Edit2 size={13} />
-          <span className="hidden sm:inline">Edit</span>
-        </button>
-        <Link
-          to={`/spaces/${space.id}`}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm transition-colors font-medium"
-        >
-          <Eye size={13} />
-          <span className="hidden sm:inline">View</span>
-        </Link>
-        <button
-          onClick={() => onToggleHide(space)}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors font-medium ${
-            space.hidden
-              ? "border-[#9FB366] text-[#9FB366] hover:bg-green-50"
-              : "border-gray-200 text-gray-500 hover:bg-gray-50"
-          }`}
-          title={space.hidden ? "Show space publicly" : "Hide space from public"}
-        >
-          {space.hidden ? <Eye size={13} /> : <EyeOff size={13} />}
-          <span className="hidden sm:inline">{space.hidden ? "Show" : "Hide"}</span>
-        </button>
-        <button
-          onClick={onDelete}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm transition-colors font-medium"
-        >
-          <Trash2 size={13} />
-          <span className="hidden sm:inline">Delete</span>
-        </button>
-      </div>
+
+      {/* Thumbtack — same position as homepage SpaceCard */}
+      <img
+        src={thumbtackImg}
+        alt=""
+        aria-hidden="true"
+        className="absolute -top-6 -right-3 w-[80px] pointer-events-none select-none z-10 rotate-12"
+      />
     </div>
   );
 }
 
 function SpacesSection({ createdSpaces, onCreateSpace, onEditSpace, onDeleteSpace, onToggleHide, isAdmin }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [query, setQuery] = useState("");
+
+  const filteredSpaces = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return createdSpaces;
+    return createdSpaces.filter((s) => {
+      const hay = [
+        s.name, s.address, s.neighborhood, s.category, s.description,
+        ...(s.amenities || []),
+      ].filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }, [createdSpaces, query]);
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">{isAdmin ? "All Spaces" : "Spaces"}</h2>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {createdSpaces.length} space{createdSpaces.length !== 1 ? "s" : ""} {isAdmin ? "on the site" : "created"}
-          </p>
-        </div>
-        <button
-          onClick={onCreateSpace}
-          className="flex items-center gap-2 bg-[#9FB366] hover:bg-[#8a9c57] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
-        >
-          <Plus size={14} />
-          Create Space
-        </button>
-      </div>
+    <div className="flex flex-col gap-6">
+      <SectionHeader
+        title={isAdmin ? "All Spaces" : "Your Spaces"}
+        subtitle={`${createdSpaces.length} space${createdSpaces.length !== 1 ? "s" : ""} ${isAdmin ? "on the site" : "created"}`}
+        action={<CreateButton onClick={onCreateSpace} label="Create Space" />}
+      />
+
+      {createdSpaces.length > 0 && (
+        <HostSearchBar
+          value={query}
+          onChange={setQuery}
+          placeholder="Search your spaces by name, address, neighborhood, or amenity…"
+        />
+      )}
 
       {createdSpaces.length === 0 ? (
-        <div className="bg-gray-50 rounded-2xl border border-dashed border-gray-300 p-8 flex flex-col items-center text-center gap-2">
-          <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
-            <Building2 size={20} className="text-gray-400" />
-          </div>
-          <p className="text-sm font-semibold text-gray-700 mt-1">No spaces yet</p>
-          <p className="text-xs text-gray-400 max-w-xs">
-            Create a space to promote your venue and link it to events you host.
-          </p>
-          <button
-            onClick={onCreateSpace}
-            className="mt-2 px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
-          >
-            Create Space
-          </button>
-        </div>
+        <EmptyHostState
+          icon={Building2}
+          title="No spaces yet"
+          body="Create a space to promote your venue and link it to events you host."
+          ctaLabel="Create Space"
+          onCta={onCreateSpace}
+        />
+      ) : filteredSpaces.length === 0 ? (
+        <EmptyHostState
+          icon={Search}
+          title="No matches"
+          body={`Nothing matches "${query}". Try a different keyword or clear the search.`}
+        />
       ) : (
-        <div className="flex flex-col gap-3">
-          {createdSpaces.map((space) => (
+        <div className="flex flex-col gap-6">
+          {filteredSpaces.map((space) => (
             <SpaceCard
               key={space.id}
               space={space}
@@ -2202,37 +2777,21 @@ function SpacesSection({ createdSpaces, onCreateSpace, onEditSpace, onDeleteSpac
         </div>
       )}
 
-      {/* Delete confirmation modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-              <Trash2 size={22} className="text-red-600" />
-            </div>
-            <h3 className="font-bold text-gray-900 text-lg text-center mb-1">Delete Space?</h3>
-            <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed">
+        <DeleteConfirmModal
+          title="Delete Space?"
+          body={
+            <>
               <span className="font-semibold text-gray-700">"{deleteConfirm.name}"</span> will be
               permanently removed. This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  onDeleteSpace(deleteConfirm.id);
-                  setDeleteConfirm(null);
-                }}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+          onCancel={() => setDeleteConfirm(null)}
+          onConfirm={() => {
+            onDeleteSpace(deleteConfirm.id);
+            setDeleteConfirm(null);
+          }}
+        />
       )}
     </div>
   );
@@ -2250,7 +2809,7 @@ const NAV_SECTIONS = [
 ];
 
 export default function HostTools() {
-  const { user, setUser, authLoading, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, replaceCreatedEvent, deleteEvent, updateEvent, hiddenEventIds, hideEvent, showEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, replaceCreatedSpace, deleteCreatedSpace, updateCreatedSpace, hostTemplates, addHostTemplate } = useUser();
+  const { user, setUser, authLoading, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, replaceCreatedEvent, deleteEvent, updateEvent, hiddenEventIds, hideEvent, showEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, replaceCreatedSpace, deleteCreatedSpace, updateCreatedSpace, hostTemplates, addHostTemplate, updateHostTemplate, deleteHostTemplate } = useUser();
   const { events: allDbEvents } = useEvents();
   const templates = [...INITIAL_TEMPLATES, ...hostTemplates];
   const navigate = useNavigate();
@@ -2265,11 +2824,49 @@ export default function HostTools() {
   const [hideToast, setHideToast] = useState(null);
   const [editingSpace, setEditingSpace] = useState(null);
   const [initialTemplate, setInitialTemplate] = useState(null);
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [templateSaveError, setTemplateSaveError] = useState("");
 
   useEffect(() => {
     if (authLoading) return;
     if (!user || (user.role !== "host" && user.role !== "admin")) navigate("/signin");
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (location.state?.section) {
+      const s = location.state.section;
+      if (["events", "templates", "spaces", "profile", "bookmarks", "attending"].includes(s)) {
+        setActiveSection(s);
+      }
+    } else {
+      setActiveSection("profile");
+    }
+    if (location.state?.create) {
+      setEditingEvent(null);
+      setInitialTemplate(null);
+      setCreateEventOpen(true);
+    } else {
+      setCreateEventOpen(false);
+      setCreateSpaceOpen(false);
+      setEditingEvent(null);
+      setEditingSpace(null);
+      setInitialTemplate(null);
+    }
+  }, [location.key]);
+
+  // These memos must run on every render (Rules of Hooks: no hooks after conditional returns)
+  const allHostEvents = useMemo(() => {
+    if (!user || user.role === "admin") return allDbEvents;
+    const ownedDbEvents = allDbEvents.filter((e) => e.host_id === user.id);
+    const merged = [...createdEvents, ...ownedDbEvents];
+    const seen = new Set();
+    const deduped = merged.filter((e) => { if (seen.has(e.id)) return false; seen.add(e.id); return true; });
+    return deduped
+      .filter((e) => !deletedEventIds.has(e.id))
+      .map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e));
+  }, [user?.role, allDbEvents, user?.id, createdEvents, deletedEventIds, editedEvents]);
+
+  const allCatalogEvents = allDbEvents;
 
   if (authLoading) return null;
   if (!user || (user.role !== "host" && user.role !== "admin")) return null;
@@ -2333,48 +2930,50 @@ export default function HostTools() {
     setCreateEventOpen(true);
   }
 
+  function handleEditTemplate(tpl) {
+    setEditingTemplate(tpl);
+    setTemplateSaveError("");
+  }
+
+  async function handleSaveEditedTemplate(changes) {
+    try {
+      await updateHostTemplate(editingTemplate.id, changes);
+      setEditingTemplate(null);
+    } catch {
+      setTemplateSaveError("Failed to save — please try again.");
+    }
+  }
+
+  function handleDeleteTemplate(id) {
+    deleteHostTemplate(id);
+    setEditingTemplate(null);
+  }
+
   function handleCancelCreate() {
     setCreateEventOpen(false);
     setEditingEvent(null);
     setInitialTemplate(null);
   }
 
-  // Admin sees all DB events; host sees their own (optimistic + DB-persisted)
-  const allHostEvents = useMemo(() => {
-    if (user.role === "admin") return allDbEvents;
-    // Pull DB events owned by this host so they survive page refreshes
-    const ownedDbEvents = allDbEvents.filter((e) => e.host_id === user.id);
-    const merged = [...createdEvents, ...ownedDbEvents];
-    // Deduplicate — createdEvents (optimistic) take precedence over DB copies
-    const seen = new Set();
-    const deduped = merged.filter((e) => { if (seen.has(e.id)) return false; seen.add(e.id); return true; });
-    return deduped
-      .filter((e) => !deletedEventIds.has(e.id))
-      .map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e));
-  }, [user.role, allDbEvents, user.id, createdEvents, deletedEventIds, editedEvents]);
-
-  // Full catalog (for the Bookmarked Events section)
-  const allCatalogEvents = useMemo(() => {
-    const merged = [...createdEvents, ...staticEvents];
-    const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
-    return filtered.map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e));
-  }, [createdEvents, deletedEventIds, editedEvents]);
-
   async function handlePublishSpace(spaceData) {
     // Preserve original host_id when admin edits another host's space
     const hostId = editingSpace?.host_id ?? user.id;
     const payload = { ...spaceData, host_id: hostId };
     if (editingSpace) {
-      updateCreatedSpace(editingSpace.id, spaceData);
-      await updateSpaceInDB(editingSpace.id, payload);
+      const prevSpace = createdSpaces.find((s) => s.id === editingSpace.id);
+      updateCreatedSpace(editingSpace.id, payload);
+      try {
+        await updateSpaceInDB(editingSpace.id, payload);
+      } catch (err) {
+        if (prevSpace) updateCreatedSpace(editingSpace.id, prevSpace);
+        throw err;
+      }
     } else {
       const tempId = spaceData.id;
-      addCreatedSpace(spaceData);
+      addCreatedSpace(payload);
       try {
         const dbSpace = await createSpaceInDB(payload);
-        if (dbSpace && dbSpace.id !== tempId) {
-          replaceCreatedSpace(tempId, { ...spaceData, ...dbSpace });
-        }
+        if (dbSpace) replaceCreatedSpace(tempId, { ...payload, ...dbSpace });
       } catch (err) {
         deleteCreatedSpace(tempId);
         throw err;
@@ -2432,13 +3031,23 @@ export default function HostTools() {
         createdSpaces={createdSpaces}
         onCancel={handleCancelCreate}
         onPublish={handlePublish}
-        onSaveTemplate={addHostTemplate}
+        onSaveTemplate={(tpl) => addHostTemplate({ ...tpl, host_id: user.id })}
       />
     );
   }
 
   return (
     <main className="bg-gray-50 min-h-screen">
+      {editingTemplate && (
+        <EditTemplateModal
+          template={editingTemplate}
+          saveError={templateSaveError}
+          onSave={handleSaveEditedTemplate}
+          onDelete={() => handleDeleteTemplate(editingTemplate.id)}
+          onCancel={() => { setEditingTemplate(null); setTemplateSaveError(""); }}
+        />
+      )}
+
       {/* Visibility toast */}
       <div
         className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-4 py-2.5 rounded-full shadow-lg text-sm font-medium pointer-events-none transition-all duration-300 ${
@@ -2452,7 +3061,7 @@ export default function HostTools() {
         <div className="flex flex-col md:flex-row gap-6">
 
           {/* ── Sidebar ── */}
-          <aside className="md:w-72 flex-shrink-0">
+          <aside className="md:w-72 flex-shrink-0 md:sticky md:top-20 md:self-start md:max-h-[calc(100vh-6rem)] md:overflow-y-auto">
             {/* Mobile: horizontal pills */}
             <div className="flex md:hidden gap-2 overflow-x-auto pb-1 mb-4">
               {NAV_SECTIONS.map(({ id, label, icon: Icon }) => (
@@ -2558,6 +3167,8 @@ export default function HostTools() {
                 templates={templates}
                 onCreateTemplate={() => { setEditingEvent(null); setInitialTemplate(null); setCreateEventOpen(true); }}
                 onUseTemplate={handleUseTemplate}
+                onEditTemplate={handleEditTemplate}
+                onDeleteTemplate={handleDeleteTemplate}
               />
             )}
             {activeSection === "spaces" && (

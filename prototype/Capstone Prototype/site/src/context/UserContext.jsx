@@ -2,6 +2,16 @@ import { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { fetchUserAttendance, markAttendance, unmarkAttendance, trackAnalytic } from "../lib/events";
 import { fetchSpacesByHost, fetchAllSpaces } from "../lib/spaces";
+import { fetchHostTemplates, upsertTemplate, deleteTemplate } from "../lib/templates";
+import {
+  fetchUserBookmarks,
+  fetchUserBookmarkGroups,
+  insertBookmark,
+  deleteBookmark,
+  updateBookmarkGroups,
+  insertBookmarkGroup,
+  deleteBookmarkGroup,
+} from "../lib/bookmarks";
 
 const UserContext = createContext(null);
 
@@ -45,9 +55,12 @@ export function UserProvider({ children }) {
 
       const role = profile?.role ?? "user";
 
-      const [attendedIds, dbSpaces] = await Promise.all([
+      const [attendedIds, dbSpaces, dbTemplates, dbBookmarks, dbBookmarkGroups] = await Promise.all([
         fetchUserAttendance(authUser.id).catch(() => []),
         (role === "admin" ? fetchAllSpaces() : fetchSpacesByHost(authUser.id)).catch(() => []),
+        (role === "host" || role === "admin") ? fetchHostTemplates(authUser.id).catch(() => []) : Promise.resolve([]),
+        fetchUserBookmarks(authUser.id).catch(() => []),
+        fetchUserBookmarkGroups(authUser.id).catch(() => []),
       ]);
 
       setUser({
@@ -58,6 +71,17 @@ export function UserProvider({ children }) {
       });
       setAttendingEvents(new Set(attendedIds));
       setCreatedSpaces(dbSpaces);
+      setHostTemplates(dbTemplates);
+
+      // Hydrate bookmarks state from DB
+      setBookmarkedEvents(new Set(dbBookmarks.map((b) => b.event_id)));
+      setEventGroupMap(
+        Object.fromEntries(dbBookmarks.map((b) => [b.event_id, b.group_ids || ["default"]])),
+      );
+      setBookmarkGroups([
+        { id: "default", name: "Saved Events" },
+        ...dbBookmarkGroups,
+      ]);
     } catch (err) {
       console.error("[auth] fetchAndSetProfile failed:", err);
       setUser({
@@ -100,6 +124,11 @@ export function UserProvider({ children }) {
   async function signOut() {
     await supabase.auth.signOut();
     setUser(null);
+    setBookmarkedEvents(new Set());
+    setEventGroupMap({});
+    setBookmarkGroups([{ id: "default", name: "Saved Events" }]);
+    setAttendingEvents(new Set());
+    localStorage.removeItem("bookmarkedEvents");
   }
 
   // ── Local prototype state (unchanged) ────────────────────────────────────────
@@ -110,8 +139,44 @@ export function UserProvider({ children }) {
   const [createdSpaces, setCreatedSpaces] = useState([]);
 
   const [hostTemplates, setHostTemplates] = useState([]);
-  function addHostTemplate(tpl) {
-    setHostTemplates((prev) => [...prev, tpl]);
+
+  async function addHostTemplate(tpl) {
+    const withOwner = { ...tpl, host_id: tpl.host_id };
+    setHostTemplates((prev) => [...prev, withOwner]);
+    try {
+      const saved = await upsertTemplate(withOwner);
+      setHostTemplates((prev) => prev.map((t) => (t.id === withOwner.id ? saved : t)));
+    } catch (err) {
+      setHostTemplates((prev) => prev.filter((t) => t.id !== withOwner.id));
+      console.warn("Failed to save template:", err.message);
+    }
+  }
+
+  async function updateHostTemplate(id, changes) {
+    let existing;
+    setHostTemplates((prev) => {
+      existing = prev.find((t) => t.id === id);
+      return prev.map((t) => (t.id === id ? { ...t, ...changes } : t));
+    });
+    try {
+      const saved = await upsertTemplate({ ...existing, ...changes, id });
+      setHostTemplates((prev) => prev.map((t) => (t.id === id ? saved : t)));
+    } catch (err) {
+      setHostTemplates((prev) => prev.map((t) => (t.id === id ? (existing || t) : t)));
+      console.warn("Failed to update template:", err.message);
+      throw err;
+    }
+  }
+
+  async function deleteHostTemplate(id) {
+    const prev = hostTemplates.find((t) => t.id === id);
+    setHostTemplates((p) => p.filter((t) => t.id !== id));
+    try {
+      await deleteTemplate(id);
+    } catch (err) {
+      if (prev) setHostTemplates((p) => [...p, prev]);
+      console.warn("Failed to delete template:", err.message);
+    }
   }
 
   const [bookmarkedEvents, setBookmarkedEvents] = useState(() => {
@@ -171,49 +236,124 @@ export function UserProvider({ children }) {
   }
 
   function toggleBookmark(eventId) {
+    const wasBookmarked = bookmarkedEvents.has(eventId);
+    const prevGroups = eventGroupMap[eventId];
+
+    // Optimistic update
     setBookmarkedEvents((prev) => {
       const next = new Set(prev);
-      if (next.has(eventId)) {
-        next.delete(eventId);
-        setEventGroupMap((g) => { const ng = { ...g }; delete ng[eventId]; return ng; });
-      } else {
-        next.add(eventId);
-        setEventGroupMap((g) => ({ ...g, [eventId]: ["default"] }));
-        trackAnalytic(eventId, "bookmark", user?.id ?? null);
-      }
+      if (wasBookmarked) next.delete(eventId);
+      else next.add(eventId);
       localStorage.setItem("bookmarkedEvents", JSON.stringify([...next]));
       return next;
     });
+    if (wasBookmarked) {
+      setEventGroupMap((g) => { const ng = { ...g }; delete ng[eventId]; return ng; });
+    } else {
+      setEventGroupMap((g) => ({ ...g, [eventId]: ["default"] }));
+      trackAnalytic(eventId, "bookmark", user?.id ?? null);
+    }
+
+    if (!user) return;
+
+    const op = wasBookmarked
+      ? deleteBookmark(eventId)
+      : insertBookmark(eventId, ["default"]);
+
+    op.catch((err) => {
+      console.warn("Bookmark sync failed:", err.message);
+      // Rollback
+      setBookmarkedEvents((prev) => {
+        const next = new Set(prev);
+        if (wasBookmarked) next.add(eventId);
+        else next.delete(eventId);
+        localStorage.setItem("bookmarkedEvents", JSON.stringify([...next]));
+        return next;
+      });
+      setEventGroupMap((g) => {
+        const ng = { ...g };
+        if (wasBookmarked && prevGroups) ng[eventId] = prevGroups;
+        else delete ng[eventId];
+        return ng;
+      });
+    });
   }
-  function addBookmarkGroup(name) {
-    const id = `group-${Date.now()}`;
-    setBookmarkGroups((prev) => [...prev, { id, name }]);
-    return id;
+
+  async function addBookmarkGroup(name) {
+    if (!user) {
+      const tempId = `group-${Date.now()}`;
+      setBookmarkGroups((prev) => [...prev, { id: tempId, name }]);
+      return tempId;
+    }
+    const tempId = `temp-${Date.now()}`;
+    setBookmarkGroups((prev) => [...prev, { id: tempId, name }]);
+    try {
+      const saved = await insertBookmarkGroup(name);
+      setBookmarkGroups((prev) => prev.map((g) => (g.id === tempId ? saved : g)));
+      return saved.id;
+    } catch (err) {
+      console.warn("Create bookmark group failed:", err.message);
+      setBookmarkGroups((prev) => prev.filter((g) => g.id !== tempId));
+      return null;
+    }
   }
+
   function removeBookmarkGroup(groupId) {
     if (groupId === "default") return;
+    const prevGroups = bookmarkGroups;
+    const prevMap = eventGroupMap;
+
     setBookmarkGroups((prev) => prev.filter((g) => g.id !== groupId));
+    const affectedEventIds = [];
     setEventGroupMap((prev) => {
       const next = {};
       Object.keys(prev).forEach((id) => {
         const groups = (prev[id] || ["default"]).filter((g) => g !== groupId);
         next[id] = groups.length > 0 ? groups : ["default"];
+        if ((prev[id] || []).includes(groupId)) affectedEventIds.push(id);
       });
       return next;
     });
-  }
-  function addEventToGroup(eventId, groupId) {
-    setEventGroupMap((prev) => {
-      const current = prev[eventId] || ["default"];
-      if (current.includes(groupId)) return prev;
-      return { ...prev, [eventId]: [...current, groupId] };
+
+    if (!user) return;
+
+    Promise.all([
+      deleteBookmarkGroup(groupId),
+      // Strip groupId from any bookmarks that referenced it
+      ...affectedEventIds.map((eid) => {
+        const remaining = (prevMap[eid] || ["default"]).filter((g) => g !== groupId);
+        return updateBookmarkGroups(eid, remaining);
+      }),
+    ]).catch((err) => {
+      console.warn("Delete bookmark group failed:", err.message);
+      setBookmarkGroups(prevGroups);
+      setEventGroupMap(prevMap);
     });
   }
+
+  function addEventToGroup(eventId, groupId) {
+    const current = eventGroupMap[eventId] || ["default"];
+    if (current.includes(groupId)) return;
+    const updated = [...current, groupId];
+    setEventGroupMap((prev) => ({ ...prev, [eventId]: updated }));
+
+    if (!user) return;
+    updateBookmarkGroups(eventId, updated).catch((err) => {
+      console.warn("Add to group failed:", err.message);
+      setEventGroupMap((prev) => ({ ...prev, [eventId]: current }));
+    });
+  }
+
   function removeEventFromGroup(eventId, groupId) {
-    setEventGroupMap((prev) => {
-      const current = prev[eventId] || ["default"];
-      const updated = current.filter((g) => g !== groupId);
-      return { ...prev, [eventId]: updated.length > 0 ? updated : ["default"] };
+    const current = eventGroupMap[eventId] || ["default"];
+    const filtered = current.filter((g) => g !== groupId);
+    const updated = filtered.length > 0 ? filtered : ["default"];
+    setEventGroupMap((prev) => ({ ...prev, [eventId]: updated }));
+
+    if (!user) return;
+    updateBookmarkGroups(eventId, updated).catch((err) => {
+      console.warn("Remove from group failed:", err.message);
+      setEventGroupMap((prev) => ({ ...prev, [eventId]: current }));
     });
   }
 
@@ -238,7 +378,7 @@ export function UserProvider({ children }) {
         user, setUser, authLoading,
         signUp, signIn, signOut,
         createdSpaces, setCreatedSpaces, addCreatedSpace, replaceCreatedSpace, deleteCreatedSpace, updateCreatedSpace,
-        hostTemplates, addHostTemplate,
+        hostTemplates, addHostTemplate, updateHostTemplate, deleteHostTemplate,
         createdEvents, addCreatedEvent, replaceCreatedEvent,
         deletedEventIds, deleteEvent,
         editedEvents, updateEvent,

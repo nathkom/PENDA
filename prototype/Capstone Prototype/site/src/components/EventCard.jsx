@@ -55,7 +55,7 @@ function getEventTimes(dateStr, timeStr) {
   };
 }
 
-function googleCalUrl(event) {
+export function googleCalUrl(event) {
   const times = getEventTimes(event.date, event.time);
   const base = "https://calendar.google.com/calendar/render?action=TEMPLATE";
   const title = encodeURIComponent(event.title || "Event");
@@ -91,7 +91,7 @@ function buildIcs(event) {
   ].join("\r\n");
 }
 
-function downloadIcs(event) {
+export function downloadIcs(event) {
   const blob = new Blob([buildIcs(event)], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -105,7 +105,7 @@ function downloadIcs(event) {
 
 // ── Shared action hook ────────────────────────────────────────────────────────
 
-function useEventActions(event) {
+export function useEventActions(event) {
   const [calOpen, setCalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const calRef = useRef(null);
@@ -143,7 +143,7 @@ function useEventActions(event) {
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 
-function CopiedToast({ visible }) {
+export function CopiedToast({ visible }) {
   return (
     <div
       className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-4 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-full shadow-lg pointer-events-none transition-all duration-300 ${
@@ -157,7 +157,7 @@ function CopiedToast({ visible }) {
 
 // ── Calendar dropdown ─────────────────────────────────────────────────────────
 
-function CalendarDropdown({ event, calRef, calOpen, setCalOpen }) {
+export function CalendarDropdown({ event, calRef, calOpen, setCalOpen }) {
   return (
     <div ref={calRef} className="relative">
       <button

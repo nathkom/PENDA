@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { LayoutGrid, Map } from "lucide-react";
+import { LayoutGrid, Map, Search } from "lucide-react";
 import { filterEvents } from "../utils/filters";
 import EmptyState from "../components/EmptyState";
 import NeighborhoodsMap from "../components/NeighborhoodsMap";
@@ -100,6 +100,42 @@ export default function Events() {
     setSearchParams({});
   }
 
+  function handleSearchChange(val) {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (val.trim()) next.set("q", val);
+        else next.delete("q");
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
+  const searchBar = (
+    <label className="flex-1 min-w-0 bg-white rounded-2xl border border-gray-200 shadow-sm flex items-center gap-2.5 px-4 cursor-text focus-within:ring-2 focus-within:ring-[#9FB366] focus-within:border-transparent transition-shadow hover:shadow-md self-stretch">
+      <Search size={16} className="text-gray-400 shrink-0" aria-hidden="true" />
+      <input
+        type="text"
+        value={urlKeyword}
+        onChange={(e) => handleSearchChange(e.target.value)}
+        placeholder="Search events, venues, tags…"
+        className="flex-1 min-w-0 bg-transparent text-sm focus:outline-none placeholder:text-gray-400 py-4"
+        aria-label="Search events"
+      />
+      {urlKeyword && (
+        <button
+          type="button"
+          onClick={() => handleSearchChange("")}
+          className="text-gray-400 hover:text-gray-600 text-xs shrink-0 px-1"
+          aria-label="Clear search"
+        >
+          Clear
+        </button>
+      )}
+    </label>
+  );
+
   const viewToggle = (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-2 flex gap-1.5">
       <button
@@ -134,21 +170,24 @@ export default function Events() {
           <div className="flex flex-col gap-5">
             <div className="flex items-start gap-6">
               <div className="w-72 shrink-0">{viewToggle}</div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Browse Events</h1>
-                <p className="text-gray-500 text-sm mt-0.5">
-                  {filteredEvents.length} event
-                  {filteredEvents.length !== 1 ? "s" : ""} in the Greater Seattle Area
-                  {activeCount > 0 && (
-                    <button
-                      onClick={handleClear}
-                      className="ml-3 inline-flex items-center gap-1 text-sm font-semibold text-red-500 hover:text-red-700 transition-colors"
-                      aria-label="Clear all filters"
-                    >
-                      × Clear {activeCount} filter{activeCount !== 1 ? "s" : ""}
-                    </button>
-                  )}
-                </p>
+              <div className="flex-1 min-w-0 flex items-center gap-4">
+                <div className="shrink-0">
+                  <h1 className="text-2xl font-bold text-gray-900">Browse Events</h1>
+                  <p className="text-gray-500 text-sm mt-0.5">
+                    {filteredEvents.length} event
+                    {filteredEvents.length !== 1 ? "s" : ""} in the Greater Seattle Area
+                    {activeCount > 0 && (
+                      <button
+                        onClick={handleClear}
+                        className="ml-3 inline-flex items-center gap-1 text-sm font-semibold text-red-500 hover:text-red-700 transition-colors"
+                        aria-label="Clear all filters"
+                      >
+                        × Clear {activeCount} filter{activeCount !== 1 ? "s" : ""}
+                      </button>
+                    )}
+                  </p>
+                </div>
+                {searchBar}
               </div>
             </div>
             <NeighborhoodsMap
@@ -173,21 +212,22 @@ export default function Events() {
             </aside>
 
             <div className="flex-1 min-w-0">
-              <div className="mb-5">
-                <p className="text-gray-500 text-sm mt-0.5">
-                  {filteredEvents.length} event
-                  {filteredEvents.length !== 1 ? "s" : ""} in the Greater Seattle Area
-                  {activeCount > 0 && (
-                    <button
-                      onClick={handleClear}
-                      className="ml-3 inline-flex items-center gap-1 text-sm font-semibold text-red-500 hover:text-red-700 transition-colors"
-                      aria-label="Clear all filters"
-                    >
-                      × Clear {activeCount} filter{activeCount !== 1 ? "s" : ""}
-                    </button>
-                  )}
-                </p>
+              <div className="sticky top-16 z-30 -mt-4 pt-4 pb-3 bg-gray-50 flex">
+                {searchBar}
               </div>
+              <p className="text-gray-500 text-sm mb-5">
+                {filteredEvents.length} event
+                {filteredEvents.length !== 1 ? "s" : ""} in the Greater Seattle Area
+                {activeCount > 0 && (
+                  <button
+                    onClick={handleClear}
+                    className="ml-3 inline-flex items-center gap-1 text-sm font-semibold text-red-500 hover:text-red-700 transition-colors"
+                    aria-label="Clear all filters"
+                  >
+                    × Clear {activeCount} filter{activeCount !== 1 ? "s" : ""}
+                  </button>
+                )}
+              </p>
 
               {loading ? (
                 <div className="flex flex-col gap-4">

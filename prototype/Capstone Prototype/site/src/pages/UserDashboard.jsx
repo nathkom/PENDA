@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { User, Bookmark, ChevronRight, Camera, Mail, Lock, Eye, EyeOff, CalendarCheck } from "lucide-react";
 import { useUser } from "../context/UserContext";
-import { events as staticEvents } from "../data/events";
+import { useEvents } from "../hooks/useEvents";
 import BookmarkedEventsSection from "../components/BookmarkedEventsSection";
 import AttendingEventsSection from "../components/AttendingEventsSection";
 
@@ -160,12 +160,12 @@ function UserProfileSection({ user, setUser }) {
 export default function UserDashboard() {
   const {
     user, setUser, authLoading,
-    createdEvents, deletedEventIds, editedEvents,
     bookmarkedEvents, toggleBookmark,
     bookmarkGroups, addBookmarkGroup, removeBookmarkGroup,
     eventGroupMap, addEventToGroup, removeEventFromGroup,
     attendingEvents, unmarkAttending,
   } = useUser();
+  const { events: allCatalogEvents } = useEvents();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -181,12 +181,6 @@ export default function UserDashboard() {
 
   if (authLoading) return null;
   if (!user) return null;
-
-  const allCatalogEvents = useMemo(() => {
-    const merged = [...createdEvents, ...staticEvents];
-    const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
-    return filtered.map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e));
-  }, [createdEvents, deletedEventIds, editedEvents]);
 
   return (
     <main className="bg-gray-50 min-h-screen">

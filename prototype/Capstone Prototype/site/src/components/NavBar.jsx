@@ -4,7 +4,6 @@ import {
   NavLink,
   useLocation,
   useNavigate,
-  useSearchParams,
 } from "react-router-dom";
 import {
   Menu,
@@ -12,7 +11,6 @@ import {
   User,
   LogOut,
   Settings,
-  Search,
   Bookmark,
 } from "lucide-react";
 import { useUser } from "../context/UserContext";
@@ -27,26 +25,12 @@ export default function NavBar() {
   const { user, signOut } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [sliderStyle, setSliderStyle] = useState({ left: 0, width: 0 });
-  const [navSearch, setNavSearch] = useState("");
   const containerRef = useRef(null);
   const itemRefs = useRef([]);
   const profileRef = useRef(null);
-
-  const isEventsPage = location.pathname === "/events";
-
-  // Sync navSearch with URL when navigating to/from events page
-  useEffect(() => {
-    if (isEventsPage) {
-      setNavSearch(searchParams.get("q") || "");
-    } else {
-      setNavSearch("");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEventsPage]);
 
   // Sliding pill animation
   useEffect(() => {
@@ -87,28 +71,12 @@ export default function NavBar() {
     navigate("/");
   }
 
-  function handleNavSearch(val) {
-    setNavSearch(val);
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (val.trim()) next.set("q", val);
-        else next.delete("q");
-        return next;
-      },
-      { replace: true },
-    );
-  }
-
   const initials = user?.name ? user.name.slice(0, 2).toUpperCase() : "U";
 
   const mobileLinkClass = ({ isActive }) =>
     isActive
       ? "bg-gray-900 text-white font-semibold px-5 py-2 rounded-full transition-colors"
       : "text-gray-700 font-medium px-5 py-2 rounded-full hover:bg-gray-200 transition-colors";
-
-  // Shared transition timing
-  const T = "cubic-bezier(0.4,0,0.2,1)";
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
@@ -122,20 +90,12 @@ export default function NavBar() {
           Common Grounds
         </Link>
 
-        {/* ── Desktop center: pill nav ↔ search bar ── */}
-        <div className="hidden md:flex flex-1 items-center justify-center overflow-hidden px-4">
-          {/* Pill nav — slides right and fades out on events page */}
+        {/* ── Desktop center: pill nav ── */}
+        <div className="hidden md:flex flex-1 items-center justify-center px-4">
           <ul
             ref={containerRef}
             className="flex items-center relative list-none bg-gray-100 rounded-full p-1 whitespace-nowrap"
             role="list"
-            style={{
-              maxWidth: isEventsPage ? 0 : 500,
-              opacity: isEventsPage ? 0 : 1,
-              overflow: "hidden",
-              transition: `max-width 0.35s ${T}, opacity 0.2s ease`,
-              pointerEvents: isEventsPage ? "none" : "auto",
-            }}
           >
             <div
               aria-hidden="true"
@@ -164,70 +124,10 @@ export default function NavBar() {
               </li>
             ))}
           </ul>
-
-          {/* Search bar — grows in when on events page */}
-          <div
-            style={{
-              maxWidth: isEventsPage ? 560 : 0,
-              opacity: isEventsPage ? 1 : 0,
-              overflow: "hidden",
-              width: "100%",
-              transition: `max-width 0.35s ${T}, opacity 0.2s ease`,
-              pointerEvents: isEventsPage ? "auto" : "none",
-            }}
-          >
-            <div className="px-1">
-              <div className="relative">
-                <Search
-                  size={15}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
-                  aria-hidden="true"
-                />
-                <input
-                  type="text"
-                  value={navSearch}
-                  onChange={(e) => handleNavSearch(e.target.value)}
-                  placeholder="Search events, venues, tags…"
-                  className="w-full pl-9 pr-4 py-2.5 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition-colors"
-                  aria-label="Search events"
-                />
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* ── Desktop right section ── */}
         <div className="hidden md:flex items-center gap-3 shrink-0">
-          {/* Plain nav links — slide in on events page */}
-          <div
-            className="flex items-center gap-5"
-            style={{
-              maxWidth: isEventsPage ? 320 : 0,
-              opacity: isEventsPage ? 1 : 0,
-              overflow: "hidden",
-              whiteSpace: "nowrap",
-              transition: `max-width 0.35s ${T}, opacity 0.25s ease`,
-              pointerEvents: isEventsPage ? "auto" : "none",
-            }}
-          >
-            {NAV_LINKS.map(({ to, label, end }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                className={({ isActive }) =>
-                  `text-sm font-medium transition-colors px-1 ${
-                    isActive
-                      ? "text-gray-900 font-bold"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`
-                }
-              >
-                {label}
-              </NavLink>
-            ))}
-          </div>
-
           {/* Create + button (hosts + admins) */}
           {(user?.role === "host" || user?.role === "admin") && (
             <button
@@ -344,23 +244,6 @@ export default function NavBar() {
       {/* Mobile dropdown */}
       {menuOpen && (
         <div className="md:hidden bg-white border-t border-gray-100 px-4 py-4 flex flex-col gap-2">
-          {/* Mobile search (events page only) */}
-          {isEventsPage && (
-            <div className="relative mb-1">
-              <Search
-                size={15}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
-                type="text"
-                value={navSearch}
-                onChange={(e) => handleNavSearch(e.target.value)}
-                placeholder="Search events…"
-                className="w-full pl-9 pr-4 py-2.5 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-          )}
-
           {NAV_LINKS.map(({ to, label, end }) => (
             <NavLink
               key={to}
