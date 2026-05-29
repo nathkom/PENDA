@@ -65,6 +65,9 @@ export default function EventDetail() {
     markAttending,
     unmarkAttending,
     createdSpaces,
+    likedEvents,
+    toggleLike,
+    getLikeCount,
   } = useUser();
   const { events: allEvents, loading } = useEvents();
 
@@ -96,26 +99,7 @@ export default function EventDetail() {
 
   const { calOpen, setCalOpen, calRef, copied, handleShare } = useEventActions(event ?? { id: "" });
 
-  const [likedEvents, setLikedEvents] = useState(() => {
-    const saved = localStorage.getItem("likedEvents");
-    return saved ? JSON.parse(saved) : {};
-  });
   const [attendPop, setAttendPop] = useState(false);
-
-  function toggleLike(eventId) {
-    const newLiked = !likedEvents[eventId];
-    const updated = { ...likedEvents, [eventId]: newLiked };
-    setLikedEvents(updated);
-    localStorage.setItem("likedEvents", JSON.stringify(updated));
-    if (newLiked) {
-      trackAnalytic(eventId, "like", user?.id ?? null);
-    }
-  }
-
-  function getLikeCount(e) {
-    const base = e.likes || 0;
-    return likedEvents[e.id] ? base + 1 : base;
-  }
 
   if (loading) {
     return (
@@ -218,12 +202,12 @@ export default function EventDetail() {
                   <button
                     onClick={() => toggleLike(event.id)}
                     className={`shrink-0 flex items-center gap-1.5 font-semibold transition-colors mt-1 ${
-                      likedEvents[event.id]
+                      likedEvents.has(event.id)
                         ? "text-red-500"
                         : "text-gray-400 hover:text-red-400"
                     }`}
                     aria-label={
-                      likedEvents[event.id] ? "Unlike event" : "Like event"
+                      likedEvents.has(event.id) ? "Unlike event" : "Like event"
                     }
                   >
                     ❤️ <span className="text-base">{getLikeCount(event)}</span>

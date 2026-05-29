@@ -7,7 +7,7 @@ import { supabase } from "./supabase";
 const CATALOG_EVENT_COLUMNS =
   "id,title,space_name,neighborhood,category,description,date,time," +
   "cost,cost_amount,accessibility,tags,image_url,featured," +
-  "attending_count,attending_limit,hide_when_full,hidden,host_id";
+  "attending_count,attending_limit,hide_when_full,hidden,host_id,likes";
 
 export async function fetchAllEvents() {
   const { data, error } = await supabase

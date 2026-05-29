@@ -4,7 +4,6 @@ import { SlidersHorizontal, X, MapPin, Users, Clock } from "lucide-react";
 import { useUser } from "../context/UserContext";
 import { useEvents } from "../hooks/useEvents";
 import { useSpaces } from "../hooks/useSpaces";
-import { trackAnalytic } from "../lib/events";
 import { filterEvents } from "../utils/filters";
 import { spaces as staticSpaces } from "../data/spaces";
 import BulletinBoard from "../components/BulletinBoard";
@@ -163,12 +162,7 @@ function CatalogToggle({ value, onChange }) {
 export default function Home() {
   const [catalogView, setCatalogView] = useState("events");
 
-  const [likedEvents, setLikedEvents] = useState(() => {
-    const saved = localStorage.getItem("likedEvents");
-    return saved ? JSON.parse(saved) : {};
-  });
-
-  const { user, bookmarkedEvents, toggleBookmark, createdSpaces } = useUser();
+  const { bookmarkedEvents, toggleBookmark, createdSpaces, likedEvents, toggleLike, getLikeCount } = useUser();
   const { events: allEvents, loading } = useEvents();
   const { spaces: dbSpaces, loading: spacesLoading } = useSpaces();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -180,18 +174,6 @@ export default function Home() {
     setDisplayCount(ITEMS_PER_PAGE);
   }, [catalogView, filters]);
 
-  const toggleLike = (eventId) => {
-    const newLiked = !likedEvents[eventId];
-    const updated = { ...likedEvents, [eventId]: newLiked };
-    setLikedEvents(updated);
-    localStorage.setItem("likedEvents", JSON.stringify(updated));
-    if (newLiked) trackAnalytic(eventId, "like", user?.id ?? null);
-  };
-
-  const getLikeCount = (event) => {
-    const base = event.likes || 0;
-    return likedEvents[event.id] ? base + 1 : base;
-  };
 
   const filteredEvents = useMemo(
     () => filterEvents(allEvents, filters),
@@ -308,7 +290,7 @@ export default function Home() {
                     <EventCard
                       key={event.id}
                       event={event}
-                      liked={likedEvents[event.id]}
+                      liked={likedEvents.has(event.id)}
                       likeCount={getLikeCount(event)}
                       onToggleLike={toggleLike}
                       bookmarked={bookmarkedEvents.has(event.id)}

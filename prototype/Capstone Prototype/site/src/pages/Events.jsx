@@ -8,7 +8,6 @@ import FilterCard from "../components/FilterCard";
 import EventCard from "../components/EventCard";
 import { useUser } from "../context/UserContext";
 import { useEvents } from "../hooks/useEvents";
-import { trackAnalytic } from "../lib/events";
 
 const DEFAULT_FILTERS = {
   neighborhoods: [],
@@ -21,7 +20,7 @@ const DEFAULT_FILTERS = {
 };
 
 export default function Events() {
-  const { user, bookmarkedEvents, toggleBookmark } = useUser();
+  const { bookmarkedEvents, toggleBookmark, likedEvents, toggleLike, getLikeCount } = useUser();
   const { events, loading } = useEvents();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -43,26 +42,6 @@ export default function Events() {
 
   const [viewMode, setViewMode] = useState("card");
   const [mapSelectedNeighborhood, setMapSelectedNeighborhood] = useState("");
-
-  const [likedEvents, setLikedEvents] = useState(() => {
-    const saved = localStorage.getItem("likedEvents");
-    return saved ? JSON.parse(saved) : {};
-  });
-
-  function toggleLike(eventId) {
-    const newLiked = !likedEvents[eventId];
-    const updated = { ...likedEvents, [eventId]: newLiked };
-    setLikedEvents(updated);
-    localStorage.setItem("likedEvents", JSON.stringify(updated));
-    if (newLiked) {
-      trackAnalytic(eventId, "like", user?.id ?? null);
-    }
-  }
-
-  function getLikeCount(event) {
-    const base = event.likes || 0;
-    return likedEvents[event.id] ? base + 1 : base;
-  }
 
   useEffect(() => {
     const nbParam = searchParams.get("neighborhood");
@@ -243,7 +222,7 @@ export default function Events() {
                     <EventCard
                       key={event.id}
                       event={event}
-                      liked={likedEvents[event.id]}
+                      liked={likedEvents.has(event.id)}
                       likeCount={getLikeCount(event)}
                       onToggleLike={toggleLike}
                       bookmarked={bookmarkedEvents.has(event.id)}

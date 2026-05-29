@@ -13,6 +13,7 @@ import {
   insertBookmarkGroup,
   deleteBookmarkGroup,
 } from "../lib/bookmarks";
+import { fetchUserLikes, insertLike, deleteLike } from "../lib/likes";
 
 const UserContext = createContext(null);
 
@@ -56,12 +57,13 @@ export function UserProvider({ children }) {
 
       const role = profile?.role ?? "user";
 
-      const [attendedIds, dbSpaces, dbTemplates, dbBookmarks, dbBookmarkGroups] = await Promise.all([
+      const [attendedIds, dbSpaces, dbTemplates, dbBookmarks, dbBookmarkGroups, likedIds] = await Promise.all([
         fetchUserAttendance(authUser.id).catch(() => []),
         (role === "admin" ? fetchAllSpaces() : fetchSpacesByHost(authUser.id)).catch(() => []),
         (role === "host" || role === "admin") ? fetchHostTemplates(authUser.id).catch(() => []) : Promise.resolve([]),
         fetchUserBookmarks(authUser.id).catch(() => []),
         fetchUserBookmarkGroups(authUser.id).catch(() => []),
+        fetchUserLikes(authUser.id).catch(() => []),
       ]);
 
       setUser({
@@ -83,6 +85,7 @@ export function UserProvider({ children }) {
         { id: "default", name: "Saved Events" },
         ...dbBookmarkGroups,
       ]);
+      setLikedEvents(new Set(likedIds));
     } catch (err) {
       console.error("[auth] fetchAndSetProfile failed:", err);
       setUser({
@@ -136,6 +139,9 @@ export function UserProvider({ children }) {
     setEventGroupMap({});
     setBookmarkGroups([{ id: "default", name: "Saved Events" }]);
     setAttendingEvents(new Set());
+    setLikedEvents(new Set());
+    setLikeDeltas({});
+    setLikeInFlight(new Set());
     localStorage.removeItem("bookmarkedEvents");
     // Drop any role-scoped rows the previous user may have surfaced into cache.
     clearCache();
@@ -197,6 +203,53 @@ export function UserProvider({ children }) {
   const [bookmarkGroups, setBookmarkGroups] = useState([{ id: "default", name: "Saved Events" }]);
   const [eventGroupMap, setEventGroupMap] = useState({});
   const [attendingEvents, setAttendingEvents] = useState(new Set());
+  const [likedEvents, setLikedEvents] = useState(new Set());
+  // Per-session delta vs the like count we last fetched from the DB. Lets the
+  // visible count update instantly on click and rolls back on sync failure.
+  const [likeDeltas, setLikeDeltas] = useState({});
+  // In-flight toggle guard so rapid double-clicks can't queue duplicate ops.
+  const [likeInFlight, setLikeInFlight] = useState(new Set());
+
+  function getLikeCount(event) {
+    if (!event) return 0;
+    return Math.max(0, (event.likes ?? 0) + (likeDeltas[event.id] || 0));
+  }
+
+  function toggleLike(eventId) {
+    if (!user) return;
+    if (likeInFlight.has(eventId)) return;
+    const wasLiked = likedEvents.has(eventId);
+    const delta = wasLiked ? -1 : 1;
+
+    setLikedEvents((prev) => {
+      const next = new Set(prev);
+      if (wasLiked) next.delete(eventId);
+      else next.add(eventId);
+      return next;
+    });
+    setLikeDeltas((prev) => ({ ...prev, [eventId]: (prev[eventId] || 0) + delta }));
+    setLikeInFlight((prev) => new Set(prev).add(eventId));
+
+    const op = wasLiked ? deleteLike(eventId) : insertLike(eventId);
+    op
+      .catch((err) => {
+        console.warn("Like sync failed:", err.message);
+        setLikedEvents((prev) => {
+          const next = new Set(prev);
+          if (wasLiked) next.add(eventId);
+          else next.delete(eventId);
+          return next;
+        });
+        setLikeDeltas((prev) => ({ ...prev, [eventId]: (prev[eventId] || 0) - delta }));
+      })
+      .finally(() => {
+        setLikeInFlight((prev) => {
+          const next = new Set(prev);
+          next.delete(eventId);
+          return next;
+        });
+      });
+  }
 
   function addCreatedSpace(space) {
     setCreatedSpaces((prev) => [space, ...prev]);
@@ -397,6 +450,7 @@ export function UserProvider({ children }) {
         bookmarkGroups, addBookmarkGroup, removeBookmarkGroup,
         eventGroupMap, addEventToGroup, removeEventFromGroup,
         attendingEvents, markAttending, unmarkAttending,
+        likedEvents, toggleLike, getLikeCount,
       }}
     >
       {children}
