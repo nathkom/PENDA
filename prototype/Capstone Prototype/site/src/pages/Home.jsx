@@ -1,19 +1,20 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { SlidersHorizontal, X, MapPin, Users, Clock } from "lucide-react";
 import { useUser } from "../context/UserContext";
 import { useEvents } from "../hooks/useEvents";
+import { useSpaces } from "../hooks/useSpaces";
 import { trackAnalytic } from "../lib/events";
 import { filterEvents } from "../utils/filters";
 import { spaces as staticSpaces } from "../data/spaces";
-import { fetchAllSpaces } from "../lib/spaces";
 import BulletinBoard from "../components/BulletinBoard";
 import FilterCard from "../components/FilterCard";
 import EventCard from "../components/EventCard";
 import EmptyState from "../components/EmptyState";
-import NeighborhoodCarousel from "../components/NeighborhoodCarousel";
 import headerBg from "../../wireframes/headerbackground1.png";
 import thumbtackImg from "../../wireframes/thumbtack.png";
+
+const NeighborhoodCarousel = lazy(() => import("../components/NeighborhoodCarousel"));
 
 const ITEMS_PER_PAGE = 15;
 
@@ -169,18 +170,10 @@ export default function Home() {
 
   const { user, bookmarkedEvents, toggleBookmark, createdSpaces } = useUser();
   const { events: allEvents, loading } = useEvents();
+  const { spaces: dbSpaces, loading: spacesLoading } = useSpaces();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
-  const [dbSpaces, setDbSpaces] = useState([]);
-  const [spacesLoading, setSpacesLoading] = useState(true);
-
-  useEffect(() => {
-    fetchAllSpaces()
-      .then(setDbSpaces)
-      .catch(() => {})
-      .finally(() => setSpacesLoading(false));
-  }, []);
 
   // Reset pagination whenever the view or filters change
   useEffect(() => {
@@ -377,7 +370,9 @@ export default function Home() {
       </div>
 
       {/* Section C — Neighborhood carousel */}
-      <NeighborhoodCarousel />
+      <Suspense fallback={<div className="h-64" />}>
+        <NeighborhoodCarousel />
+      </Suspense>
 
       {/* Mobile filter drawer — events only */}
       {mobileFilterOpen && (

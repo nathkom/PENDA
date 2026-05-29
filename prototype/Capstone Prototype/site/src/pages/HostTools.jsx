@@ -1761,7 +1761,7 @@ function EditTemplateModal({ template, saveError, onSave, onDelete, onCancel }) 
                   onClick={() => setConfirmDelete(false)}
                   className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                 >
-                  Cancel
+                  Keep template
                 </button>
               </div>
             ) : (
@@ -2815,7 +2815,7 @@ const NAV_SECTIONS = [
 
 export default function HostTools() {
   const { user, setUser, authLoading, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, replaceCreatedEvent, deleteEvent, updateEvent, hiddenEventIds, hideEvent, showEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, replaceCreatedSpace, deleteCreatedSpace, updateCreatedSpace, hostTemplates, addHostTemplate, updateHostTemplate, deleteHostTemplate } = useUser();
-  const { events: allDbEvents } = useEvents();
+  const { events: allDbEvents } = useEvents({ mode: "full" });
   const templates = [...INITIAL_TEMPLATES, ...hostTemplates];
   const navigate = useNavigate();
   const location = useLocation();

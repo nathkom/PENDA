@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { fetchUserAttendance, markAttendance, unmarkAttendance, trackAnalytic } from "../lib/events";
 import { fetchSpacesByHost, fetchAllSpaces } from "../lib/spaces";
 import { fetchHostTemplates, upsertTemplate, deleteTemplate } from "../lib/templates";
+import { clearCache } from "../lib/cache";
 import {
   fetchUserBookmarks,
   fetchUserBookmarkGroups,
@@ -110,6 +111,13 @@ export function UserProvider({ children }) {
         role:      safeRole,
       });
       if (profileError) throw profileError;
+
+      // supabase.auth.signUp triggers onAuthStateChange, which races
+      // fetchAndSetProfile against the INSERT above. The SELECT often wins,
+      // finds no row, and falls back to role="user" — locking new hosts out
+      // of host-only routes until a manual refresh. Re-run the loader now
+      // that the profile row definitely exists.
+      await fetchAndSetProfile(data.user);
     }
 
     return data;
@@ -129,6 +137,8 @@ export function UserProvider({ children }) {
     setBookmarkGroups([{ id: "default", name: "Saved Events" }]);
     setAttendingEvents(new Set());
     localStorage.removeItem("bookmarkedEvents");
+    // Drop any role-scoped rows the previous user may have surfaced into cache.
+    clearCache();
   }
 
   // ── Local prototype state (unchanged) ────────────────────────────────────────

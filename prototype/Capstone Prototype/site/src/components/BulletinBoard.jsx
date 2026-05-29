@@ -121,8 +121,16 @@ const GAP = 24; // px between cards
 
 const MONTH_ABBR = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
 const now = new Date();
-const currentMonthId = `${MONTH_ABBR[now.getMonth()]}-${now.getFullYear()}`;
-const DEFAULT_INDEX = Math.max(0, bulletins.findIndex(b => b.id === currentMonthId));
+const currentMonthValue = now.getFullYear() * 12 + now.getMonth();
+
+// Hide bulletins for any month later than the current one. They become
+// visible automatically once that month arrives.
+function bulletinMonthValue(id) {
+  const [abbr, year] = id.split("-");
+  return Number(year) * 12 + MONTH_ABBR.indexOf(abbr);
+}
+const visibleBulletins = bulletins.filter(b => bulletinMonthValue(b.id) <= currentMonthValue);
+const DEFAULT_INDEX = Math.max(0, visibleBulletins.length - 1);
 
 export default function BulletinBoard() {
   const [activeIndex, setActiveIndex] = useState(DEFAULT_INDEX);
@@ -144,9 +152,9 @@ export default function BulletinBoard() {
   const peekOffset = (containerWidth - cardWidth) / 2; // centers card 0
   const translateX = peekOffset - activeIndex * (cardWidth + GAP);
 
-  const goTo   = (i) => setActiveIndex(Math.max(0, Math.min(bulletins.length - 1, i)));
+  const goTo   = (i) => setActiveIndex(Math.max(0, Math.min(visibleBulletins.length - 1, i)));
   const canPrev = activeIndex > 0;
-  const canNext = activeIndex < bulletins.length - 1;
+  const canNext = activeIndex < visibleBulletins.length - 1;
 
   return (
     <section className="pt-8 pb-4" aria-label="Bulletin Board of the Month">
@@ -163,7 +171,7 @@ export default function BulletinBoard() {
           className="flex items-start transition-transform duration-[420ms] ease-in-out"
           style={{ transform: `translateX(${translateX}px)`, gap: `${GAP}px` }}
         >
-          {bulletins.map((b, i) => (
+          {visibleBulletins.map((b, i) => (
             <div
               key={b.id}
               style={{ width: `${cardWidth}px`, height: `${cardHeight}px`, flexShrink: 0 }}

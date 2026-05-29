@@ -1,7 +1,22 @@
 import { supabase } from "./supabase";
 
+// Public catalog rendering only — heavy fields stay in the detail/admin queries.
+const CATALOG_SPACE_COLUMNS =
+  "id,name,neighborhood,category,description,hours,capacity," +
+  "amenities,image_url,hidden,host_id";
+
 export async function fetchAllSpaces() {
   const { data, error } = await supabase.from("spaces").select("*").order("name");
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchCatalogSpaces() {
+  const { data, error } = await supabase
+    .from("spaces")
+    .select(CATALOG_SPACE_COLUMNS)
+    .eq("hidden", false)
+    .order("name");
   if (error) throw error;
   return data ?? [];
 }

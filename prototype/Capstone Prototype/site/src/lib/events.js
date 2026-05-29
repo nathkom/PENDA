@@ -1,9 +1,27 @@
 import { supabase } from "./supabase";
 
+// Catalog-only projection: just what EventCard renders + what filterEvents
+// reads. Heavy fields (gallery_images, accessibility_info, noise_level,
+// space_format, crowd_level, show_attendance, contact_email) load lazily
+// via fetchEventById on the detail page or via fetchAllEvents in host tools.
+const CATALOG_EVENT_COLUMNS =
+  "id,title,space_name,neighborhood,category,description,date,time," +
+  "cost,cost_amount,accessibility,tags,image_url,featured," +
+  "attending_count,attending_limit,hide_when_full,hidden,host_id";
+
 export async function fetchAllEvents() {
   const { data, error } = await supabase
     .from("events")
     .select("*")
+    .order("date");
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchCatalogEvents() {
+  const { data, error } = await supabase
+    .from("events")
+    .select(CATALOG_EVENT_COLUMNS)
     .order("date");
   if (error) throw error;
   return data ?? [];

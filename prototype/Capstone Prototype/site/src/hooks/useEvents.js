@@ -1,16 +1,24 @@
 import { useState, useEffect, useMemo } from "react";
-import { fetchAllEvents } from "../lib/events";
+import { fetchAllEvents, fetchCatalogEvents } from "../lib/events";
 import { useUser } from "../context/UserContext";
+import { getCached, fetchWithCache, setCached } from "../lib/cache";
 
-export function useEvents() {
+// mode:
+//   "catalog" — slim columns, shared cache; for Home / Events / Neighborhoods / UserDashboard
+//   "full"    — every column, no cache; for HostTools editing
+export function useEvents({ mode = "catalog" } = {}) {
   const { createdEvents, deletedEventIds, editedEvents, attendingEvents, hiddenEventIds, user } = useUser();
-  const [dbEvents, setDbEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  const cacheKey = mode === "catalog" ? "events:catalog" : null;
+  const fetcher = mode === "catalog" ? fetchCatalogEvents : fetchAllEvents;
+
+  const initial = cacheKey ? getCached(cacheKey) : null;
+  const [dbEvents, setDbEvents] = useState(initial ?? []);
+  const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState(null);
 
   const base = import.meta.env.BASE_URL;
 
-  // Re-attach BASE_URL to relative image paths stored in Supabase
   function normalizeImages(event) {
     function fixUrl(url) {
       if (!url || url.startsWith("http") || url.startsWith("data:") || url.startsWith(base)) return url;
@@ -26,42 +34,48 @@ export function useEvents() {
   }
 
   async function load() {
-    setLoading(true);
     setError(null);
     try {
-      const data = await fetchAllEvents();
+      const data = cacheKey
+        ? await fetchWithCache(cacheKey, fetcher)
+        : await fetcher();
       setDbEvents(data.map(normalizeImages));
     } catch (err) {
-      console.error("Failed to load events from Supabase:", err);
+      console.error("Failed to load events:", err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   }
 
+  function refetch() {
+    if (cacheKey) setCached(cacheKey, null);
+    setLoading(true);
+    return load();
+  }
+
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const events = useMemo(() => {
-    // createdEvents (optimistic) take precedence over DB rows
     const optimisticIds = new Set(createdEvents.map((e) => e.id));
-    const base = [
+    const baseList = [
       ...createdEvents,
       ...dbEvents.filter((e) => !optimisticIds.has(e.id)),
     ];
     const isAdmin = user?.role === "admin";
-    return base
+    return baseList
       .filter((e) => !deletedEventIds.has(e.id))
       .map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e))
       .filter((e) => isAdmin || (!e.hidden && !hiddenEventIds.has(e.id)))
       .filter((e) => {
         if (!e.hide_when_full || !e.attending_limit || isAdmin) return true;
-        // Keep the event visible if the current user is already attending
         if (attendingEvents.has(e.id)) return true;
         return (e.attending_count || 0) < e.attending_limit;
       });
   }, [dbEvents, createdEvents, deletedEventIds, editedEvents, attendingEvents, hiddenEventIds, user?.role]);
 
-  return { events, loading, error, refetch: load };
+  return { events, loading, error, refetch };
 }

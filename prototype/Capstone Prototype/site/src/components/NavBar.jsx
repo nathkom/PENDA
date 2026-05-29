@@ -179,13 +179,17 @@ export default function NavBar() {
                     </button>
                   )}
 
-                  {/* Profile + Bookmarks — only visible to non-hosts */}
+                  {/* Profile + Bookmarks — hosts manage these inside Host Tools */}
                   {user.role !== "host" && (
                     <>
                       <button
                         onClick={() => {
                           setProfileOpen(false);
-                          navigate("/dashboard");
+                          if (user.role === "admin") {
+                            navigate("/host", { state: { section: "profile" } });
+                          } else {
+                            navigate("/dashboard");
+                          }
                         }}
                         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                       >
@@ -195,9 +199,8 @@ export default function NavBar() {
                       <button
                         onClick={() => {
                           setProfileOpen(false);
-                          navigate("/dashboard", {
-                            state: { section: "bookmarks" },
-                          });
+                          const target = user.role === "admin" ? "/host" : "/dashboard";
+                          navigate(target, { state: { section: "bookmarks" } });
                         }}
                         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                       >
@@ -296,19 +299,24 @@ export default function NavBar() {
 
                 {user.role !== "host" && (
                   <>
-                    <NavLink
-                      to="/dashboard"
-                      className={mobileLinkClass}
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      Profile
-                    </NavLink>
                     <button
                       onClick={() => {
                         setMenuOpen(false);
-                        navigate("/dashboard", {
-                          state: { section: "bookmarks" },
-                        });
+                        if (user.role === "admin") {
+                          navigate("/host", { state: { section: "profile" } });
+                        } else {
+                          navigate("/dashboard");
+                        }
+                      }}
+                      className="text-left text-gray-700 font-medium px-5 py-2 rounded-full hover:bg-gray-200 transition-colors"
+                    >
+                      Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        const target = user.role === "admin" ? "/host" : "/dashboard";
+                        navigate(target, { state: { section: "bookmarks" } });
                       }}
                       className="text-left text-gray-700 font-medium px-5 py-2 rounded-full hover:bg-gray-200 transition-colors"
                     >
