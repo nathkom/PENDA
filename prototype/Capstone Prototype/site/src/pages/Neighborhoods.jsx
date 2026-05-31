@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { neighborhoods } from "../data/neighborhoods";
+import { useEvents } from "../hooks/useEvents";
 
 // ── Neighborhood images ───────────────────────────────────────────────────────
 import imgCapitolHill from "../../images/neighborhood_images/capitolhill.jpg";
@@ -36,7 +37,6 @@ const NEIGHBORHOOD_TAPES = {
   "south-lake-union": tapeStartape,
   "university-district": tapeYellowtape,
 };
-import { events as staticEvents } from "../data/events";
 import { useUser } from "../context/UserContext";
 import EventCard from "../components/EventCard";
 import EmptyState from "../components/EmptyState";
@@ -107,6 +107,9 @@ function NeighborhoodDetail({
   allEvents,
   bookmarkedEvents,
   toggleBookmark,
+  likedEvents,
+  toggleLike,
+  getLikeCount,
 }) {
   const neighborhoodEvents = allEvents.filter(
     (e) => e.neighborhood === neighborhood.name,
@@ -165,6 +168,9 @@ function NeighborhoodDetail({
               event={event}
               bookmarked={bookmarkedEvents?.has(event.id)}
               onToggleBookmark={toggleBookmark}
+              liked={likedEvents?.has(event.id)}
+              likeCount={getLikeCount?.(event)}
+              onToggleLike={toggleLike}
             />
           ))}
         </div>
@@ -177,27 +183,14 @@ function NeighborhoodDetail({
 export default function Neighborhoods() {
   const [searchParams, setSearchParams] = useSearchParams();
   const {
-    createdEvents,
-    deletedEventIds,
-    editedEvents,
     bookmarkedEvents,
     toggleBookmark,
-    attendingEvents,
+    likedEvents,
+    toggleLike,
+    getLikeCount,
   } = useUser();
+  const { events: allEvents } = useEvents();
   const selectedId = searchParams.get("id");
-
-  const allEvents = useMemo(() => {
-    const merged = [...createdEvents, ...staticEvents];
-    const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
-    return filtered
-      .map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e))
-      .filter(
-        (e) =>
-          !e.attending_limit ||
-          (e.attending_count || 0) + (attendingEvents.has(e.id) ? 1 : 0) <
-            e.attending_limit,
-      );
-  }, [createdEvents, deletedEventIds, editedEvents, attendingEvents]);
 
   const selected = selectedId
     ? neighborhoods.find((n) => n.id === selectedId)
@@ -229,6 +222,9 @@ export default function Neighborhoods() {
           allEvents={allEvents}
           bookmarkedEvents={bookmarkedEvents}
           toggleBookmark={toggleBookmark}
+          likedEvents={likedEvents}
+          toggleLike={toggleLike}
+          getLikeCount={getLikeCount}
         />
       </main>
     );

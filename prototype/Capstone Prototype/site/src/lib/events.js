@@ -9,10 +9,21 @@ const CATALOG_EVENT_COLUMNS =
   "cost,cost_amount,accessibility,tags,image_url,featured," +
   "attending_count,attending_limit,hide_when_full,hidden,host_id,likes";
 
+// All columns needed for host/admin management, but gallery_images is excluded
+// from the list query — it loads per-event via fetchEventById to avoid timeouts
+// caused by base64-encoded images stored in that column.
+const HOST_EVENT_COLUMNS =
+  "id,title,space_name,neighborhood,category,description," +
+  "date,time,cost,cost_amount,accessibility,tags," +
+  "image_url,contact_email,featured," +
+  "noise_level,accessibility_info,space_format,crowd_level," +
+  "attending_limit,show_attendance,attending_count,hidden," +
+  "hide_when_full,host_id,likes";
+
 export async function fetchAllEvents() {
   const { data, error } = await supabase
     .from("events")
-    .select("*")
+    .select(HOST_EVENT_COLUMNS)
     .order("date");
   if (error) throw error;
   return data ?? [];

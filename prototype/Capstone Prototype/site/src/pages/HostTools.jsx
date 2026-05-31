@@ -11,6 +11,7 @@ import AccessibilityTags from "../components/AccessibilityTags";
 import { useUser } from "../context/UserContext";
 import { NEIGHBORHOODS } from "../utils/filters";
 import {
+  fetchEventById,
   createEvent as createEventInDB,
   updateEvent as updateEventInDB,
   deleteEvent as deleteEventInDB,
@@ -25,6 +26,7 @@ import {
   uploadSpaceImage,
 } from "../lib/spaces";
 import { useEvents } from "../hooks/useEvents";
+import { spaces as staticSpaces } from "../data/spaces";
 import BookmarkedEventsSection from "../components/BookmarkedEventsSection";
 import AttendingEventsSection from "../components/AttendingEventsSection";
 import thumbtackImg from "../../wireframes/thumbtack.png";
@@ -565,6 +567,8 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
   const [templatesOpen, setTemplatesOpen] = useState(true);
   const [publishError, setPublishError] = useState("");
   const [templateSaved, setTemplateSaved] = useState(false);
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateError, setTemplateError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -629,9 +633,13 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
   }
 
   async function handleSaveTemplate() {
+    if (templateSaving) return;
     const name = form.title.trim() || "Untitled Template";
     const tags = form.tagsInput ? form.tagsInput.split(",").map((t) => t.trim()).filter(Boolean) : [];
     const templateId = crypto.randomUUID();
+
+    setTemplateSaving(true);
+    setTemplateError(false);
 
     const resolveImage = async (url) => {
       if (!url.startsWith("blob:")) return url;
@@ -649,20 +657,28 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
     };
     const images = await Promise.all(imagePreviews.map(resolveImage));
 
+    const desc = form.description || "";
     const lastEdited = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    onSaveTemplate({
-      id: templateId,
-      name,
-      category: form.category,
-      description: (form.description || "").slice(0, 90) + (form.description.length > 90 ? "…" : ""),
-      lastEdited,
-      last_edited: lastEdited,
-      image: images[0] || null,
-      images,
-      prefill: { ...form, tags },
-    });
-    setTemplateSaved(true);
-    setTimeout(() => setTemplateSaved(false), 2000);
+    try {
+      await onSaveTemplate({
+        id: templateId,
+        name,
+        category: form.category,
+        description: desc.slice(0, 90) + (desc.length > 90 ? "…" : ""),
+        lastEdited,
+        last_edited: lastEdited,
+        image: images[0] || null,
+        images,
+        prefill: { ...form, tags },
+      });
+      setTemplateSaved(true);
+      setTimeout(() => setTemplateSaved(false), 2000);
+    } catch {
+      setTemplateError(true);
+      setTimeout(() => setTemplateError(false), 3000);
+    } finally {
+      setTemplateSaving(false);
+    }
   }
 
   async function handlePublish() {
@@ -1311,11 +1327,16 @@ function CreateEventView({ editingEvent, initialTemplate, templates, createdSpac
         <button
           type="button"
           onClick={handleSaveTemplate}
-          className={`px-8 py-2.5 rounded-full font-semibold text-sm transition-colors ${
-            templateSaved ? "bg-green-100 text-green-700" : "bg-stone-500 hover:bg-stone-600 text-white"
+          disabled={templateSaving}
+          className={`px-8 py-2.5 rounded-full font-semibold text-sm transition-colors disabled:opacity-60 ${
+            templateSaved
+              ? "bg-green-100 text-green-700"
+              : templateError
+              ? "bg-red-100 text-red-700"
+              : "bg-stone-500 hover:bg-stone-600 text-white"
           }`}
         >
-          {templateSaved ? "Template Saved!" : "Save Template"}
+          {templateSaving ? "Saving…" : templateSaved ? "Template Saved!" : templateError ? "Save Failed" : "Save Template"}
         </button>
         <button
           type="button"
@@ -1868,7 +1889,7 @@ function TemplatesSection({ templates, onCreateTemplate, onUseTemplate, onEditTe
 
 // ─── Shared Host UI Primitives ────────────────────────────────────────────────
 
-function HostActionButtons({ viewHref, onEdit, onToggleHide, hidden, onDelete }) {
+function HostActionButtons({ viewHref, onEdit, editLoading, onToggleHide, hidden, onDelete }) {
   const baseCls =
     "flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors";
   return (
@@ -1876,9 +1897,10 @@ function HostActionButtons({ viewHref, onEdit, onToggleHide, hidden, onDelete })
       <button
         type="button"
         onClick={onEdit}
-        className={`${baseCls} border-gray-400 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-600`}
+        disabled={editLoading}
+        className={`${baseCls} ${editLoading ? "opacity-50 cursor-not-allowed border-gray-300 text-gray-400" : "border-gray-400 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-600"}`}
       >
-        Edit
+        {editLoading ? "Loading…" : "Edit"}
         <Edit2 size={14} />
       </button>
       <Link
@@ -1897,8 +1919,8 @@ function HostActionButtons({ viewHref, onEdit, onToggleHide, hidden, onDelete })
             : "border-gray-400 hover:border-[#9FB366] hover:text-[#9FB366] text-gray-600"
         }`}
       >
-        {hidden ? "Show" : "Hide"}
-        {hidden ? <Eye size={14} /> : <EyeOff size={14} />}
+        {hidden ? "Hidden" : "Hide"}
+        {hidden ? <EyeOff size={14} /> : <EyeOff size={14} />}
       </button>
       <button
         type="button"
@@ -2011,7 +2033,7 @@ function EmptyHostState({ icon: Icon, title, body, ctaLabel, onCta }) {
 
 // ─── Events Section ───────────────────────────────────────────────────────────
 
-function HostEventCard({ event, onEdit, onToggleHide, onDelete }) {
+function HostEventCard({ event, onEdit, editLoading, onToggleHide, onDelete }) {
   const costCls = COST_BADGE[event.cost] || "bg-gray-100 text-gray-600";
   const costLbl = COST_LABEL[event.cost] || "Free";
   const dateStr = formatCardDate(event.date);
@@ -2104,6 +2126,7 @@ function HostEventCard({ event, onEdit, onToggleHide, onDelete }) {
               <HostActionButtons
                 viewHref={`/events/${event.id}`}
                 onEdit={onEdit}
+                editLoading={editLoading}
                 onToggleHide={onToggleHide}
                 hidden={event.hidden}
                 onDelete={onDelete}
@@ -2126,29 +2149,36 @@ function HostEventCard({ event, onEdit, onToggleHide, onDelete }) {
 
 function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent, onToggleHide, isAdmin }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState(new Set());
+  const [loadingEditId, setLoadingEditId] = useState(null);
   const [query, setQuery] = useState("");
+
+  const visibleEvents = pendingDeleteIds.size > 0
+    ? hostEvents.filter((e) => !pendingDeleteIds.has(e.id))
+    : hostEvents;
 
   const filteredEvents = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return hostEvents;
-    return hostEvents.filter((e) => {
+    if (!q) return visibleEvents;
+    return visibleEvents.filter((e) => {
       const hay = [
         e.title, e.space_name, e.neighborhood, e.category, e.description,
         ...(e.tags || []),
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q);
     });
-  }, [hostEvents, query]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleEvents, query]);
 
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader
         title={isAdmin ? "All Events" : "Your Events"}
-        subtitle={`${hostEvents.length} event${hostEvents.length !== 1 ? "s" : ""} ${isAdmin ? "on the site" : "posted"}`}
+        subtitle={`${visibleEvents.length} event${visibleEvents.length !== 1 ? "s" : ""} ${isAdmin ? "on the site" : "posted"}`}
         action={<CreateButton onClick={onCreateEvent} label="Create Event" />}
       />
 
-      {hostEvents.length > 0 && (
+      {visibleEvents.length > 0 && (
         <HostSearchBar
           value={query}
           onChange={setQuery}
@@ -2156,7 +2186,7 @@ function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent, 
         />
       )}
 
-      {hostEvents.length === 0 ? (
+      {visibleEvents.length === 0 ? (
         <EmptyHostState
           icon={Calendar}
           title="No events yet"
@@ -2176,7 +2206,12 @@ function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent, 
             <HostEventCard
               key={event.id}
               event={event}
-              onEdit={() => onEditEvent(event)}
+              onEdit={async () => {
+                setLoadingEditId(event.id);
+                await onEditEvent(event);
+                setLoadingEditId(null);
+              }}
+              editLoading={loadingEditId === event.id}
               onToggleHide={() => onToggleHide(event)}
               onDelete={() => setDeleteConfirm(event)}
             />
@@ -2195,6 +2230,7 @@ function EventsSection({ hostEvents, onCreateEvent, onEditEvent, onDeleteEvent, 
           }
           onCancel={() => setDeleteConfirm(null)}
           onConfirm={() => {
+            setPendingDeleteIds((prev) => new Set([...prev, deleteConfirm.id]));
             onDeleteEvent(deleteConfirm.id);
             setDeleteConfirm(null);
           }}
@@ -2724,29 +2760,35 @@ function SpaceCard({ space, onEdit, onDelete, onToggleHide }) {
 
 function SpacesSection({ createdSpaces, onCreateSpace, onEditSpace, onDeleteSpace, onToggleHide, isAdmin }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState(new Set());
   const [query, setQuery] = useState("");
+
+  const visibleSpaces = pendingDeleteIds.size > 0
+    ? createdSpaces.filter((s) => !pendingDeleteIds.has(s.id))
+    : createdSpaces;
 
   const filteredSpaces = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return createdSpaces;
-    return createdSpaces.filter((s) => {
+    if (!q) return visibleSpaces;
+    return visibleSpaces.filter((s) => {
       const hay = [
         s.name, s.address, s.neighborhood, s.category, s.description,
         ...(s.amenities || []),
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q);
     });
-  }, [createdSpaces, query]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleSpaces, query]);
 
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader
         title={isAdmin ? "All Spaces" : "Your Spaces"}
-        subtitle={`${createdSpaces.length} space${createdSpaces.length !== 1 ? "s" : ""} ${isAdmin ? "on the site" : "created"}`}
+        subtitle={`${visibleSpaces.length} space${visibleSpaces.length !== 1 ? "s" : ""} ${isAdmin ? "on the site" : "created"}`}
         action={<CreateButton onClick={onCreateSpace} label="Create Space" />}
       />
 
-      {createdSpaces.length > 0 && (
+      {visibleSpaces.length > 0 && (
         <HostSearchBar
           value={query}
           onChange={setQuery}
@@ -2754,7 +2796,7 @@ function SpacesSection({ createdSpaces, onCreateSpace, onEditSpace, onDeleteSpac
         />
       )}
 
-      {createdSpaces.length === 0 ? (
+      {visibleSpaces.length === 0 ? (
         <EmptyHostState
           icon={Building2}
           title="No spaces yet"
@@ -2793,6 +2835,7 @@ function SpacesSection({ createdSpaces, onCreateSpace, onEditSpace, onDeleteSpac
           }
           onCancel={() => setDeleteConfirm(null)}
           onConfirm={() => {
+            setPendingDeleteIds((prev) => new Set([...prev, deleteConfirm.id]));
             onDeleteSpace(deleteConfirm.id);
             setDeleteConfirm(null);
           }}
@@ -2814,8 +2857,8 @@ const NAV_SECTIONS = [
 ];
 
 export default function HostTools() {
-  const { user, setUser, authLoading, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, replaceCreatedEvent, deleteEvent, updateEvent, hiddenEventIds, hideEvent, showEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, replaceCreatedSpace, deleteCreatedSpace, updateCreatedSpace, hostTemplates, addHostTemplate, updateHostTemplate, deleteHostTemplate } = useUser();
-  const { events: allDbEvents } = useEvents({ mode: "full" });
+  const { user, setUser, authLoading, createdEvents, deletedEventIds, editedEvents, addCreatedEvent, replaceCreatedEvent, deleteEvent, updateEvent, hiddenEventIds, hideEvent, showEvent, bookmarkedEvents, toggleBookmark, bookmarkGroups, addBookmarkGroup, removeBookmarkGroup, eventGroupMap, addEventToGroup, removeEventFromGroup, attendingEvents, unmarkAttending, createdSpaces, addCreatedSpace, replaceCreatedSpace, deleteCreatedSpace, updateCreatedSpace, deletedStaticSpaceIds, addDeletedStaticSpace, hostTemplates, addHostTemplate, updateHostTemplate, deleteHostTemplate } = useUser();
+  const { events: allDbEvents } = useEvents({ mode: "full", includeHidden: true });
   const templates = [...INITIAL_TEMPLATES, ...hostTemplates];
   const navigate = useNavigate();
   const location = useLocation();
@@ -2873,8 +2916,20 @@ export default function HostTools() {
 
   const allCatalogEvents = allDbEvents;
 
+  const allHostSpaces = useMemo(() => {
+    if (!user || user.role !== "admin") return createdSpaces;
+    const dbIds = new Set(createdSpaces.map((s) => s.id));
+    const dbNames = new Set(createdSpaces.map((s) => s.name?.toLowerCase().trim()));
+    const unimportedStatics = staticSpaces.filter(
+      (s) => !dbIds.has(s.id) && !dbNames.has(s.name?.toLowerCase().trim()) && !deletedStaticSpaceIds.has(s.id)
+    );
+    return [...createdSpaces, ...unimportedStatics];
+  }, [createdSpaces, user?.role, deletedStaticSpaceIds]);
+
   if (authLoading) return null;
   if (!user || (user.role !== "host" && user.role !== "admin")) return null;
+
+  const isStaticSpace = (id) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
   async function handlePublish(eventData) {
     const payload = { ...eventData, host_id: user.id };
@@ -2902,10 +2957,18 @@ export default function HostTools() {
     setActiveSection("events");
   }
 
-  function handleEditEvent(event) {
-    setInitialTemplate(null);
-    setEditingEvent(event);
-    setCreateEventOpen(true);
+  async function handleEditEvent(event) {
+    try {
+      const full = await fetchEventById(event.id);
+      setInitialTemplate(null);
+      setEditingEvent(full);
+      setCreateEventOpen(true);
+    } catch (err) {
+      console.warn("Failed to load event for editing:", err.message);
+      setInitialTemplate(null);
+      setEditingEvent(event);
+      setCreateEventOpen(true);
+    }
   }
 
   function handleToggleHide(event) {
@@ -2964,7 +3027,17 @@ export default function HostTools() {
     // Preserve original host_id when admin edits another host's space
     const hostId = editingSpace?.host_id ?? user.id;
     const payload = { ...spaceData, host_id: hostId };
-    if (editingSpace) {
+    if (editingSpace && isStaticSpace(editingSpace.id)) {
+      // Static space being edited for the first time — create a DB record instead of updating.
+      // Strip the slug id so the DB assigns a real UUID.
+      const { id: _slug, ...payloadWithoutId } = payload;
+      try {
+        const dbSpace = await createSpaceInDB(payloadWithoutId);
+        if (dbSpace) addCreatedSpace(dbSpace);
+      } catch (err) {
+        throw err;
+      }
+    } else if (editingSpace) {
       const prevSpace = createdSpaces.find((s) => s.id === editingSpace.id);
       updateCreatedSpace(editingSpace.id, payload);
       try {
@@ -2990,6 +3063,23 @@ export default function HostTools() {
   }
 
   function handleToggleHideSpace(space) {
+    if (isStaticSpace(space.id)) {
+      // Import the static space to DB as hidden so it persists.
+      // Strip the slug id — the DB will assign a real UUID.
+      const { id: _slug, ...rest } = space;
+      createSpaceInDB({ ...rest, host_id: user.id, hidden: true })
+        .then((dbSpace) => {
+          if (dbSpace) addCreatedSpace(dbSpace);
+          setHideToast({ message: "Space hidden from public", ok: true });
+          setTimeout(() => setHideToast(null), 3000);
+        })
+        .catch((err) => {
+          setHideToast({ message: "Failed to update visibility — check your connection", ok: false });
+          setTimeout(() => setHideToast(null), 4000);
+          console.warn("Failed to import static space:", err.message);
+        });
+      return;
+    }
     const next = !space.hidden;
     updateCreatedSpace(space.id, { ...space, hidden: next });
     setSpaceHiddenInDB(space.id, next)
@@ -3011,6 +3101,10 @@ export default function HostTools() {
   }
 
   function handleDeleteSpace(id) {
+    if (isStaticSpace(id)) {
+      addDeletedStaticSpace(id);
+      return;
+    }
     deleteCreatedSpace(id);
     deleteSpaceInDB(id).catch((err) =>
       console.warn("Failed to delete space from DB:", err.message),
@@ -3033,7 +3127,7 @@ export default function HostTools() {
         editingEvent={editingEvent}
         initialTemplate={initialTemplate}
         templates={templates}
-        createdSpaces={createdSpaces}
+        createdSpaces={allHostSpaces}
         onCancel={handleCancelCreate}
         onPublish={handlePublish}
         onSaveTemplate={(tpl) => addHostTemplate({ ...tpl, host_id: user.id })}
@@ -3178,7 +3272,7 @@ export default function HostTools() {
             )}
             {activeSection === "spaces" && (
               <SpacesSection
-                createdSpaces={createdSpaces}
+                createdSpaces={allHostSpaces}
                 onCreateSpace={() => { setEditingSpace(null); setCreateSpaceOpen(true); }}
                 onEditSpace={handleEditSpace}
                 onDeleteSpace={handleDeleteSpace}

@@ -6,7 +6,7 @@ import { getCached, fetchWithCache, setCached } from "../lib/cache";
 // mode:
 //   "catalog" — slim columns, shared cache; for Home / Events / Neighborhoods / UserDashboard
 //   "full"    — every column, no cache; for HostTools editing
-export function useEvents({ mode = "catalog" } = {}) {
+export function useEvents({ mode = "catalog", includeHidden = false } = {}) {
   const { createdEvents, deletedEventIds, editedEvents, attendingEvents, hiddenEventIds, user } = useUser();
 
   const cacheKey = mode === "catalog" ? "events:catalog" : null;
@@ -69,7 +69,7 @@ export function useEvents({ mode = "catalog" } = {}) {
     return baseList
       .filter((e) => !deletedEventIds.has(e.id))
       .map((e) => (editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e))
-      .filter((e) => isAdmin || (!e.hidden && !hiddenEventIds.has(e.id)))
+      .filter((e) => includeHidden || (!e.hidden && !hiddenEventIds.has(e.id)))
       .filter((e) => {
         if (!e.hide_when_full || !e.attending_limit || isAdmin) return true;
         if (attendingEvents.has(e.id)) return true;

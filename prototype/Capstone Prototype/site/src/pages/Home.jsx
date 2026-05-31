@@ -162,7 +162,7 @@ function CatalogToggle({ value, onChange }) {
 export default function Home() {
   const [catalogView, setCatalogView] = useState("events");
 
-  const { bookmarkedEvents, toggleBookmark, createdSpaces, likedEvents, toggleLike, getLikeCount } = useUser();
+  const { bookmarkedEvents, toggleBookmark, createdSpaces, deletedStaticSpaceIds, likedEvents, toggleLike, getLikeCount } = useUser();
   const { events: allEvents, loading } = useEvents();
   const { spaces: dbSpaces, loading: spacesLoading } = useSpaces();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -186,8 +186,9 @@ export default function Home() {
     const seen = new Set();
     return [...createdSpaces, ...dbSpaces, ...staticSpaces]
       .filter((s) => !s.hidden)
+      .filter((s) => !deletedStaticSpaceIds.has(s.id))
       .filter((s) => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
-  }, [createdSpaces, dbSpaces]);
+  }, [createdSpaces, dbSpaces, deletedStaticSpaceIds]);
 
   // When filters are active, show only spaces that host at least one matching event.
   // space_name on events is matched to space.name (existing convention throughout the app).

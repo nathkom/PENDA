@@ -143,16 +143,25 @@ export function UserProvider({ children }) {
     setLikeDeltas({});
     setLikeInFlight(new Set());
     localStorage.removeItem("bookmarkedEvents");
+    localStorage.removeItem("deletedEventIds");
+    localStorage.removeItem("deletedStaticSpaces");
     // Drop any role-scoped rows the previous user may have surfaced into cache.
     clearCache();
   }
 
   // ── Local prototype state (unchanged) ────────────────────────────────────────
   const [createdEvents, setCreatedEvents] = useState([]);
-  const [deletedEventIds, setDeletedEventIds] = useState(new Set());
+  const [deletedEventIds, setDeletedEventIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("deletedEventIds") || "[]")); }
+    catch { return new Set(); }
+  });
   const [editedEvents, setEditedEvents] = useState({});
   const [hiddenEventIds, setHiddenEventIds] = useState(new Set());
   const [createdSpaces, setCreatedSpaces] = useState([]);
+  const [deletedStaticSpaceIds, setDeletedStaticSpaceIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("deletedStaticSpaces") || "[]")); }
+    catch { return new Set(); }
+  });
 
   const [hostTemplates, setHostTemplates] = useState([]);
 
@@ -165,6 +174,7 @@ export function UserProvider({ children }) {
     } catch (err) {
       setHostTemplates((prev) => prev.filter((t) => t.id !== withOwner.id));
       console.warn("Failed to save template:", err.message);
+      throw err;
     }
   }
 
@@ -278,7 +288,19 @@ export function UserProvider({ children }) {
   }
   function deleteEvent(id) {
     setCreatedEvents((prev) => prev.filter((e) => e.id !== id));
-    setDeletedEventIds((prev) => new Set([...prev, id]));
+    setDeletedEventIds((prev) => {
+      const next = new Set([...prev, id]);
+      localStorage.setItem("deletedEventIds", JSON.stringify([...next]));
+      return next;
+    });
+  }
+
+  function addDeletedStaticSpace(id) {
+    setDeletedStaticSpaceIds((prev) => {
+      const next = new Set([...prev, id]);
+      localStorage.setItem("deletedStaticSpaces", JSON.stringify([...next]));
+      return next;
+    });
   }
   function hideEvent(id) {
     setHiddenEventIds((prev) => new Set([...prev, id]));
@@ -441,6 +463,7 @@ export function UserProvider({ children }) {
         user, setUser, authLoading,
         signUp, signIn, signOut,
         createdSpaces, setCreatedSpaces, addCreatedSpace, replaceCreatedSpace, deleteCreatedSpace, updateCreatedSpace,
+        deletedStaticSpaceIds, addDeletedStaticSpace,
         hostTemplates, addHostTemplate, updateHostTemplate, deleteHostTemplate,
         createdEvents, addCreatedEvent, replaceCreatedEvent,
         deletedEventIds, deleteEvent,

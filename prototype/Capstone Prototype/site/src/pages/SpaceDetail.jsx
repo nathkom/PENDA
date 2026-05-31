@@ -2,11 +2,11 @@ import { useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, MapPin, Clock, Globe, Share2 } from "lucide-react";
 import { spaces as staticSpaces } from "../data/spaces";
-import { events as staticEvents } from "../data/events";
 import EventCard from "../components/EventCard";
 import EventGallery from "../components/EventGallery";
 import AccessibilityTags from "../components/AccessibilityTags";
 import { useUser } from "../context/UserContext";
+import { useEvents } from "../hooks/useEvents";
 import headerBg from "../../wireframes/headerbackground1.png";
 import thumbtackImg from "../../wireframes/thumbtack.png";
 
@@ -45,26 +45,19 @@ export default function SpaceDetail() {
   const navigate = useNavigate();
   const {
     createdSpaces,
-    createdEvents,
-    deletedEventIds,
-    editedEvents,
     bookmarkedEvents,
     toggleBookmark,
+    likedEvents,
+    toggleLike,
+    getLikeCount,
   } = useUser();
+  const { events: allEvents } = useEvents();
 
   const allSpaces = useMemo(
     () => [...createdSpaces, ...staticSpaces],
     [createdSpaces],
   );
   const space = allSpaces.find((s) => s.id === id);
-
-  const allEvents = useMemo(() => {
-    const merged = [...createdEvents, ...staticEvents];
-    const filtered = merged.filter((e) => !deletedEventIds.has(e.id));
-    return filtered.map((e) =>
-      editedEvents[e.id] ? { ...e, ...editedEvents[e.id] } : e,
-    );
-  }, [createdEvents, deletedEventIds, editedEvents]);
 
   const spaceEvents = useMemo(() => {
     if (!space) return [];
@@ -263,6 +256,9 @@ export default function SpaceDetail() {
                   event={e}
                   bookmarked={bookmarkedEvents.has(e.id)}
                   onToggleBookmark={toggleBookmark}
+                  liked={likedEvents.has(e.id)}
+                  likeCount={getLikeCount(e)}
+                  onToggleLike={toggleLike}
                 />
               ))}
             </div>

@@ -100,6 +100,18 @@ export default function EventDetail() {
   const { calOpen, setCalOpen, calRef, copied, handleShare } = useEventActions(event ?? { id: "" });
 
   const [attendPop, setAttendPop] = useState(false);
+  // Local optimistic delta on top of event.attending_count. A DB trigger keeps
+  // attending_count in sync with event_attendance, so on next refetch the DB
+  // count already reflects this delta — drop it when the count or event id
+  // changes (derive-during-render reset to avoid setState-in-effect).
+  const [attendDelta, setAttendDelta] = useState(0);
+  const dbAttendingCount = event?.attending_count ?? 0;
+  const attendResetKey = `${event?.id ?? ""}|${dbAttendingCount}`;
+  const [prevResetKey, setPrevResetKey] = useState(attendResetKey);
+  if (prevResetKey !== attendResetKey) {
+    setPrevResetKey(attendResetKey);
+    setAttendDelta(0);
+  }
 
   if (loading) {
     return (
@@ -145,20 +157,22 @@ export default function EventDetail() {
 
   const isAttending = attendingEvents.has(event.id);
   const dbCount = event.attending_count || 0;
-  const effectiveAttendingCount = dbCount + (isAttending ? 1 : 0);
+  const effectiveAttendingCount = Math.max(0, dbCount + attendDelta);
   const isFull =
     !isAttending &&
     event.attending_limit != null &&
-    dbCount >= event.attending_limit;
+    effectiveAttendingCount >= event.attending_limit;
 
   function handleMarkAttending() {
     if (isFull) return;
     if (!isAttending) {
       markAttending(event.id);
+      setAttendDelta((d) => d + 1);
       setAttendPop(true);
       setTimeout(() => setAttendPop(false), 400);
     } else {
       unmarkAttending(event.id);
+      setAttendDelta((d) => d - 1);
     }
   }
 
@@ -564,6 +578,9 @@ export default function EventDetail() {
                   event={e}
                   bookmarked={bookmarkedEvents.has(e.id)}
                   onToggleBookmark={toggleBookmark}
+                  liked={likedEvents.has(e.id)}
+                  likeCount={getLikeCount(e)}
+                  onToggleLike={toggleLike}
                 />
               ))}
             </div>
@@ -595,6 +612,9 @@ export default function EventDetail() {
                   event={e}
                   bookmarked={bookmarkedEvents.has(e.id)}
                   onToggleBookmark={toggleBookmark}
+                  liked={likedEvents.has(e.id)}
+                  likeCount={getLikeCount(e)}
+                  onToggleLike={toggleLike}
                 />
               ))}
             </div>
