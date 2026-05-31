@@ -4,6 +4,7 @@ import Map, { Layer, Popup, Source } from "react-map-gl/mapbox";
 import { Link } from "react-router-dom";
 import { SlidersHorizontal, X } from "lucide-react";
 import filterBackImg from "../../wireframes/ffilterback.png";
+import { lookupVenueCoords, isMappableAddress } from "../data/venueCoords";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 const SEATTLE_CENTER = { lng: -122.3321, lat: 47.6062 };
@@ -139,10 +140,13 @@ function sampleInPolygon(geometry, eventId) {
   return { lng: (minLng + maxLng) / 2, lat: (minLat + maxLat) / 2 };
 }
 
-// Compute pin coordinates for a single event. Prefers polygon-bounded sampling
-// when the neighborhood geometry has loaded; falls back to a small hash offset
-// around the static neighborhood center.
+// Compute pin coordinates for a single event. Prefers a hardcoded venue
+// coordinate when we recognize the space_name, then falls back to
+// polygon-bounded sampling, then to a hash offset around the neighborhood
+// center.
 function computeEventCoords(event, geometries) {
+  const known = lookupVenueCoords(event.space_name);
+  if (known) return known;
   const geom = geometries[event.neighborhood];
   if (geom) return sampleInPolygon(geom, event.id);
   const center = NEIGHBORHOOD_CENTERS[event.neighborhood];
@@ -151,6 +155,64 @@ function computeEventCoords(event, geometries) {
   return {
     lng: center.lng + ((((h >> 8) & 0xff) - 128) / 128) * 0.004,
     lat: center.lat + (((h & 0xff) - 128) / 128) * 0.003,
+  };
+}
+
+// Compute pin coordinates for a single space. Spaces have a real address
+// field, but we use the hardcoded venue lookup first (so display name and
+// address resolve to the same point), then the address-name lookup as a
+// secondary attempt, then polygon-bounded sampling seeded by the space id.
+function computeSpaceCoords(space, geometries) {
+  const known = lookupVenueCoords(space.name);
+  if (known) return known;
+  if (isMappableAddress(space.address)) {
+    const fromAddress = lookupVenueCoords(space.address);
+    if (fromAddress) return fromAddress;
+  }
+  const geom = geometries[space.neighborhood];
+  if (geom) return sampleInPolygon(geom, `space-${space.id}`);
+  const center = NEIGHBORHOOD_CENTERS[space.neighborhood];
+  if (!center) return null;
+  const h = hashString(`space-${space.id}`);
+  return {
+    lng: center.lng + ((((h >> 8) & 0xff) - 128) / 128) * 0.004,
+    lat: center.lat + (((h & 0xff) - 128) / 128) * 0.003,
+  };
+}
+
+// De-duplicate spaces by id. spaces.js currently has 7 identical
+// "University Branch Library" rows; we only want one pin per real venue.
+function dedupeSpaces(spaces) {
+  const seen = new Set();
+  const out = [];
+  for (const s of spaces) {
+    if (seen.has(s.id)) continue;
+    seen.add(s.id);
+    out.push(s);
+  }
+  return out;
+}
+
+function spacesToGeoJSON(spaces, geometries) {
+  return {
+    type: "FeatureCollection",
+    features: dedupeSpaces(spaces)
+      .map((space) => {
+        const coords = computeSpaceCoords(space, geometries);
+        if (!coords) return null;
+        return {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [coords.lng, coords.lat] },
+          properties: {
+            id: space.id,
+            name: space.name,
+            address: space.address ?? "",
+            category: space.category ?? "",
+            neighborhood: space.neighborhood ?? "",
+          },
+        };
+      })
+      .filter(Boolean),
   };
 }
 
@@ -334,6 +396,13 @@ function MapFilterPanel({
           <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />
           Event pin
         </div>
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: "#00A6CB" }}
+          />
+          Space pin
+        </div>
       </div>
     </div>
   );
@@ -343,6 +412,7 @@ function MapFilterPanel({
 
 export default function NeighborhoodsMap({
   events,
+  spaces = [],
   selectedNeighborhood,
   onNeighborhoodClick,
   height = 392,
@@ -483,12 +553,26 @@ export default function NeighborhoodsMap({
 
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
+      if (event.hidden) return false;
       if (filters.category && event.category !== filters.category) return false;
       if (filters.cost === "free" && event.cost !== "free") return false;
       if (filters.cost === "paid" && event.cost === "free") return false;
       return true;
     });
   }, [events, filters]);
+
+  // Spaces have no category/cost — just respect the hidden flag and (when
+  // a neighborhood is selected) keep only spaces in that neighborhood.
+  const visibleSpaces = useMemo(() => {
+    const live = spaces.filter((s) => !s.hidden);
+    if (!selectedNeighborhood) return live;
+    return live.filter((s) => s.neighborhood === selectedNeighborhood);
+  }, [spaces, selectedNeighborhood]);
+
+  const spacesGeoJSON = useMemo(
+    () => spacesToGeoJSON(visibleSpaces, neighborhoodGeometries),
+    [visibleSpaces, neighborhoodGeometries],
+  );
 
   const activeNeighborhoods = useMemo(
     () => [...new Set(filteredEvents.map((e) => e.neighborhood))],
@@ -593,9 +677,11 @@ export default function NeighborhoodsMap({
     (evt) => {
       const features = evt.features;
 
-      // Pointer cursor for event pins
+      // Pointer cursor for event and space pins
       const hasEventPin = features?.some((f) =>
-        ["event-clusters", "event-unclustered"].includes(f.layer?.id ?? ""),
+        ["event-clusters", "event-unclustered", "space-pin"].includes(
+          f.layer?.id ?? "",
+        ),
       );
 
       const nf = features?.find((f) => f.layer?.id === "neighborhoods-fill");
@@ -684,7 +770,25 @@ export default function NeighborhoodsMap({
         return;
       }
 
-      // Priority 3: neighborhood boundary
+      // Priority 3: space pin → popup
+      const spaceFeature = features?.find((f) => f.layer?.id === "space-pin");
+      if (spaceFeature) {
+        const props = spaceFeature.properties;
+        const coords = spaceFeature.geometry.coordinates;
+        setPopupInfo({
+          kind: "space",
+          id: props.id,
+          name: props.name,
+          address: props.address,
+          category: props.category,
+          neighborhood: props.neighborhood,
+          longitude: coords[0],
+          latitude: coords[1],
+        });
+        return;
+      }
+
+      // Priority 4: neighborhood boundary
       const nf = features?.find((f) => f.layer?.id === "neighborhoods-fill");
       if (!nf) {
         setPopupInfo(null);
@@ -811,6 +915,7 @@ export default function NeighborhoodsMap({
               "event-clusters",
               "event-unclustered",
               "event-selected-pin",
+              "space-pin",
             ]}
             onClick={onClick}
             onMouseMove={onMouseMove}
@@ -935,6 +1040,20 @@ export default function NeighborhoodsMap({
               />
             </Source>
 
+            {/* ── Space pins (third spaces / venues) ─────────────────────── */}
+            <Source id="spaces" type="geojson" data={spacesGeoJSON}>
+              <Layer
+                id="space-pin"
+                type="circle"
+                paint={{
+                  "circle-color": "#00A6CB",
+                  "circle-radius": 7,
+                  "circle-stroke-width": 2,
+                  "circle-stroke-color": "#ffffff",
+                }}
+              />
+            </Source>
+
             {/* ── Popup ─────────────────────────────────────────────────── */}
             {popupInfo && (
               <Popup
@@ -997,6 +1116,38 @@ export default function NeighborhoodsMap({
                         </ul>
                       </>
                     )}
+                  </div>
+                ) : popupInfo.kind === "space" ? (
+                  <div className="min-w-[180px] p-1.5">
+                    <div className="mb-1 flex items-center gap-1.5">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ backgroundColor: "#00A6CB" }}
+                      />
+                      <span className="text-xs font-medium text-gray-400">
+                        {popupInfo.category || "Space"}
+                      </span>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {popupInfo.name}
+                    </p>
+                    {popupInfo.address && (
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {popupInfo.address}
+                      </p>
+                    )}
+                    {popupInfo.neighborhood && (
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        {popupInfo.neighborhood}
+                      </p>
+                    )}
+                    <Link
+                      to={`/spaces/${popupInfo.id}`}
+                      className="mt-2 inline-block text-xs hover:underline"
+                      style={{ color: "#00A6CB" }}
+                    >
+                      View space →
+                    </Link>
                   </div>
                 ) : (
                   <div className="min-w-[160px] p-1.5">

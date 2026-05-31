@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { neighborhoods } from "../data/neighborhoods";
 import { useEvents } from "../hooks/useEvents";
+import { useSpaces } from "../hooks/useSpaces";
+import { spaces as staticSpaces } from "../data/spaces";
 
 // ── Neighborhood images ───────────────────────────────────────────────────────
 import imgCapitolHill from "../../images/neighborhood_images/capitolhill.jpg";
@@ -188,9 +190,25 @@ export default function Neighborhoods() {
     likedEvents,
     toggleLike,
     getLikeCount,
+    createdSpaces,
+    deletedStaticSpaceIds,
   } = useUser();
   const { events: allEvents } = useEvents();
+  const { spaces: dbSpaces } = useSpaces();
   const selectedId = searchParams.get("id");
+
+  // Merge spaces from all sources, drop hidden + deleted-static IDs, dedupe.
+  const allSpaces = useMemo(() => {
+    const seen = new Set();
+    return [...createdSpaces, ...dbSpaces, ...staticSpaces]
+      .filter((s) => !s.hidden)
+      .filter((s) => !deletedStaticSpaceIds.has(s.id))
+      .filter((s) => {
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+      });
+  }, [createdSpaces, dbSpaces, deletedStaticSpaceIds]);
 
   const selected = selectedId
     ? neighborhoods.find((n) => n.id === selectedId)
@@ -238,6 +256,7 @@ export default function Neighborhoods() {
         <div className="relative mb-10">
           <NeighborhoodsMap
             events={allEvents}
+            spaces={allSpaces}
             selectedNeighborhood={mapSelectedNeighborhood}
             onNeighborhoodClick={handleMapNeighborhoodClick}
             height={600}

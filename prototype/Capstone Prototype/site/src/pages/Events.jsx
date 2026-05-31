@@ -8,6 +8,8 @@ import FilterCard from "../components/FilterCard";
 import EventCard from "../components/EventCard";
 import { useUser } from "../context/UserContext";
 import { useEvents } from "../hooks/useEvents";
+import { useSpaces } from "../hooks/useSpaces";
+import { spaces as staticSpaces } from "../data/spaces";
 
 const DEFAULT_FILTERS = {
   neighborhoods: [],
@@ -20,9 +22,24 @@ const DEFAULT_FILTERS = {
 };
 
 export default function Events() {
-  const { bookmarkedEvents, toggleBookmark, likedEvents, toggleLike, getLikeCount } = useUser();
+  const { bookmarkedEvents, toggleBookmark, likedEvents, toggleLike, getLikeCount, createdSpaces, deletedStaticSpaceIds } = useUser();
   const { events, loading } = useEvents();
+  const { spaces: dbSpaces } = useSpaces();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Mirror Home.jsx merge: createdSpaces > dbSpaces > staticSpaces; filter
+  // hidden + deleted-static IDs; dedupe by id.
+  const allSpaces = useMemo(() => {
+    const seen = new Set();
+    return [...createdSpaces, ...dbSpaces, ...staticSpaces]
+      .filter((s) => !s.hidden)
+      .filter((s) => !deletedStaticSpaceIds.has(s.id))
+      .filter((s) => {
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+      });
+  }, [createdSpaces, dbSpaces, deletedStaticSpaceIds]);
 
   const urlKeyword = searchParams.get("q") || "";
 
@@ -171,6 +188,7 @@ export default function Events() {
             </div>
             <NeighborhoodsMap
               events={filteredEvents}
+              spaces={allSpaces}
               selectedNeighborhood={mapSelectedNeighborhood}
               onNeighborhoodClick={(name) =>
                 setMapSelectedNeighborhood((prev) => (prev === name ? "" : name))
