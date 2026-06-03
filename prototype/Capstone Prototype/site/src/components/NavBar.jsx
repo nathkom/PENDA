@@ -12,6 +12,7 @@ import {
   LogOut,
   Settings,
   Bookmark,
+  Megaphone,
 } from "lucide-react";
 import { useUser } from "../context/UserContext";
 
@@ -21,7 +22,7 @@ const NAV_LINKS = [
   { to: "/events", label: "Events" },
 ];
 
-export default function NavBar() {
+export default function NavBar({ onOpenNotice }) {
   const { user, signOut } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
@@ -89,6 +90,18 @@ export default function NavBar() {
         >
           Common Grounds
         </Link>
+
+        {/* Migration notice banner — reopens the "We've moved" modal */}
+        <button
+          onClick={onOpenNotice}
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold hover:bg-amber-200 transition-colors shrink-0 animate-pulse"
+          aria-label="We've moved — view migration notice"
+          title="We've moved — click for details"
+        >
+          <Megaphone size={14} className="shrink-0" />
+          <span className="hidden sm:inline">We've moved — site closing soon</span>
+          <span className="sm:hidden">We've moved</span>
+        </button>
 
         {/* ── Desktop center: pill nav ── */}
         <div className="hidden md:flex flex-1 items-center justify-center px-4">
